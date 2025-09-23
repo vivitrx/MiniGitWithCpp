@@ -1,0 +1,25 @@
+// .vscode/tasks.json
+{
+  "version": "2.0.0", // JSON配置版本号
+  "tasks": [ // 任务数组
+    {
+      "label": "build-project", // 任务标识符，与launch.json中的preLaunchTask对应
+      "type": "shell", // 任务类型：shell命令或process
+      "command": "cd ${workspaceFolder}/build && make", // 执行的shell命令：进入build目录并运行make
+      // 备选方案（注释掉当前不需要的）：
+      // "command": "cd ${workspaceFolder} && cmake --build build", // 使用CMake构建系统
+      // "command": "cd ${workspaceFolder} && ./build.sh", // 使用自定义构建脚本
+      "group": { // 任务分组配置
+        "kind": "build", // 任务类型为构建任务
+        "isDefault": true // 设为默认构建任务
+      },
+      "presentation": { // 任务执行时的显示配置
+        "echo": true, // 显示执行的命令
+        "reveal": "always", // 总是显示终端面板
+        "focus": false, // 不自动聚焦到终端
+        "panel": "shared" // 使用共享终端面板
+      },
+      "problemMatcher": ["$gcc"] // 使用GCC问题匹配器来解析编译错误
+    }
+  ]
+}
