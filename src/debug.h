@@ -2,7 +2,7 @@
 
 template<typename T>
 T dbg(const char* file, int line, const char* expr, T value) {
-    std::cout << "[" << file << ":" << line << "] " << expr << " = " << value << std::endl;
+    std::cerr << "[" << file << ":" << line << "] " << expr << " = " << value << std::endl;
     return value;
 }
 
