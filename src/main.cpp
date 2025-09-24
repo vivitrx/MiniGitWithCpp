@@ -4,6 +4,7 @@
 #include <fstream>
 #include <ios>
 #include <iostream>
+#include <openssl/sha.h>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -74,6 +75,31 @@ int main(int argc, char *argv[]) {
     std::string blob_header = decompressed_data.substr(0, null_position);
     std::string blob_content = decompressed_data.substr(null_position + 1);
     std::cout << blob_content << std::flush;
+    return 0;
+  }
+  if (argc == 4 && std::string(argv[1]) == "hash-object" &&
+      std::string(argv[2]) == "-w") {
+    // 前置准备工作
+    std::string *file_name = argv[3]; // test.txt
+    std::ifstream file = 总之openfile(file_name);
+    std::string file_context = file.把file里的每一行都输入到file_context里;
+    int file_size = file_context.size();
+    std::string blob_context = "blob " + file_size + '\0' + file_context;
+    // 获取SHA-1 hash
+    std::string SHA_1_hash = SHA1(blob_context);
+    // 创建目录
+    std::string dir_name =
+        ".git/objects/" +
+        SHA_1_hash.substr(0, 2); // 截取SHA_1_hash的前2个字符作为目录名
+    std::directory dir = mkdir(dir_name);
+    // 获取文件名字
+    std::string blob_name = SHA_1_hash.substr(2, EOF);
+    // 获取加密内容
+    auto compressed_file = compress_zlib(blob_context);
+    // 往目录里写入文件
+    dir.writein(compressed_file);
+    // 向标准输出流打印文件名
+    std::cout << blob_name << std::flush;
     return 0;
   } else {
     std::cerr << "Unknown command " << command << '\n';
