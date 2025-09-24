@@ -2,15 +2,21 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <ios>
 #include <iostream>
+#include <istream>
+#include <iterator>
 #include <openssl/sha.h>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <zlib.h>
+
 std::string decompress_zlib(const std::string &compressed);
+std::string compute_sha1(const std::string &data);
+std::string compress_zlib(const std::string &data);
 int main(int argc, char *argv[]) {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
@@ -50,9 +56,9 @@ int main(int argc, char *argv[]) {
   } else if (argc == 4 && std::string(argv[1]) == "cat-file" &&
              std::string(argv[2]) == "-p") {
     auto hash = std::string(argv[3]);
-    dbg(hash);
+    // dbg(hash);
     auto path = ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
-    dbg(path);
+    // dbg(path);
     std::ifstream file(path, std::ios::binary);
     if (!file) {
       throw std::runtime_error("object not found: " + path);
@@ -76,30 +82,33 @@ int main(int argc, char *argv[]) {
     std::string blob_content = decompressed_data.substr(null_position + 1);
     std::cout << blob_content << std::flush;
     return 0;
-  }
-  if (argc == 4 && std::string(argv[1]) == "hash-object" &&
-      std::string(argv[2]) == "-w") {
-    // 前置准备工作
-    std::string *file_name = argv[3]; // test.txt
-    std::ifstream file = 总之openfile(file_name);
-    std::string file_context = file.把file里的每一行都输入到file_context里;
-    int file_size = file_context.size();
-    std::string blob_context = "blob " + file_size + '\0' + file_context;
-    // 获取SHA-1 hash
-    std::string SHA_1_hash = SHA1(blob_context);
-    // 创建目录
-    std::string dir_name =
-        ".git/objects/" +
-        SHA_1_hash.substr(0, 2); // 截取SHA_1_hash的前2个字符作为目录名
-    std::directory dir = mkdir(dir_name);
-    // 获取文件名字
-    std::string blob_name = SHA_1_hash.substr(2, EOF);
-    // 获取加密内容
-    auto compressed_file = compress_zlib(blob_context);
-    // 往目录里写入文件
-    dir.writein(compressed_file);
-    // 向标准输出流打印文件名
-    std::cout << blob_name << std::flush;
+  } else if (argc == 4 && std::string(argv[1]) == "hash-object" &&
+             std::string(argv[2]) == "-w") {
+
+    // 1. 读取文件内容
+    std::string file_name = argv[3]; // test.txt
+    std::ifstream file(file_name, std::ios::binary);
+    auto file_begin = std::istreambuf_iterator<char>(file);
+    auto file_end = std::istreambuf_iterator<char>();
+    std::string file_content{file_begin, file_end};
+    file.close();
+    // 2. 构建 blob 对象内容（头部 + 内容）
+    int file_size = file_content.size();
+    std::string blob_header = "blob " + std::to_string(file_size) + '\0';
+    std::string blob_content = blob_header + file_content;
+    // 3. 计算 SHA-1 哈希（对整个 blob_content）
+    std::string sha1_hash = compute_sha1(blob_content);
+    // 4. 创建对象目录
+    std::string dir_path = ".git/objects/" + sha1_hash.substr(0, 2);
+    std::filesystem::create_directories(dir_path);
+    // 5. 压缩并写入对象文件
+    std::string compressed_data = compress_zlib(blob_content);
+    std::string target_file = dir_path + "/" + sha1_hash.substr(2);
+    std::ofstream out_file(target_file, std::ios::binary);
+    out_file.write(compressed_data.data(), compressed_data.size());
+    out_file.close();
+    // 6. 输出完整的 SHA-1 哈希
+    std::cout << sha1_hash << std::flush;
     return 0;
   } else {
     std::cerr << "Unknown command " << command << '\n';
@@ -141,4 +150,42 @@ std::string decompress_zlib(const std::string &compressed) {
   }
 
   return decompressed;
+}
+std::string compute_sha1(const std::string &data) {
+  unsigned char hash[SHA_DIGEST_LENGTH];
+  SHA1(reinterpret_cast<const unsigned char *>(data.data()), data.size(), hash);
+  std::stringstream ss;
+  for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+    ss << std::hex << std::setw(2) << std::setfill('0')
+       << static_cast<int>(hash[i]);
+  }
+  return ss.str();
+}
+std::string compress_zlib(const std::string &data) {
+  z_stream zs;
+  std::fill(reinterpret_cast<char *>(&zs),
+            reinterpret_cast<char *>(&zs) + sizeof(zs), 0);
+  if (deflateInit(&zs, Z_DEFAULT_COMPRESSION) != Z_OK) {
+    throw std::runtime_error("deflateInit failed");
+  }
+  zs.next_in = (Bytef *)data.data();
+  zs.avail_in = data.size();
+  int ret;
+  char outbuffer[32768];
+  std::string compressed;
+  do {
+    zs.next_out = reinterpret_cast<Bytef *>(outbuffer);
+    zs.avail_out = sizeof(outbuffer);
+
+    ret = deflate(&zs, Z_FINISH);
+
+    if (compressed.size() < zs.total_out) {
+      compressed.append(outbuffer, zs.total_out - compressed.size());
+    }
+  } while (ret == Z_OK);
+  deflateEnd(&zs);
+  if (ret != Z_STREAM_END) {
+    throw std::runtime_error("zlib compression failed");
+  }
+  return compressed;
 }
