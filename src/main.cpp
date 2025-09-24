@@ -1,22 +1,12 @@
-#include "debug.h"
-#include <cstddef>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <ios>
-#include <iostream>
-#include <istream>
-#include <iterator>
-#include <openssl/sha.h>
-#include <ostream>
-#include <sstream>
-#include <stdexcept>
-#include <string>
-#include <zlib.h>
+#include "commands.h" // 包含命令处理函数的声明
+#include "debug.h"    // 包含调试工具
+#include <iostream>  // 用于标准输入输出
+#include <stdexcept> // 用于异常处理
+#include <string>    // 用于字符串处理
+#include <filesystem> // 如果使用文件系统操作
+#include <fstream>    // 如果使用文件流
+#include "commands.h"
 
-std::string decompress_zlib(const std::string &compressed);
-std::string compute_sha1(const std::string &data);
-std::string compress_zlib(const std::string &data);
 int main(int argc, char *argv[]) {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
@@ -84,7 +74,6 @@ int main(int argc, char *argv[]) {
     return 0;
   } else if (argc == 4 && std::string(argv[1]) == "hash-object" &&
              std::string(argv[2]) == "-w") {
-
     // 1. 读取文件内容
     std::string file_name = argv[3]; // test.txt
     std::ifstream file(file_name, std::ios::binary);
@@ -104,7 +93,8 @@ int main(int argc, char *argv[]) {
     // 5. 压缩并写入对象文件
     std::string compressed_data = compress_zlib(blob_content);
     std::string target_file = dir_path + "/" + sha1_hash.substr(2);
-    std::ofstream out_file(target_file, std::ios::binary);
+    // ​​将要以二进制模式向 target_file文件中写入数据，并且后续的所有写入操作都会保持二进制格式。​​
+    std::ofstream out_file{target_file, std::ios::binary};
     out_file.write(compressed_data.data(), compressed_data.size());
     out_file.close();
     // 6. 输出完整的 SHA-1 哈希
@@ -115,77 +105,4 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
-}
-std::string decompress_zlib(const std::string &compressed) {
-  z_stream zs;
-  std::fill(reinterpret_cast<char *>(&zs),
-            reinterpret_cast<char *>(&zs) + sizeof(zs), 0);
-
-  if (inflateInit(&zs) != Z_OK) {
-    throw std::runtime_error("zlib initialization failed");
-  }
-
-  zs.next_in = (Bytef *)compressed.data();
-  zs.avail_in = compressed.size();
-
-  int ret;
-  char outbuffer[32768]; // 32KB的缓冲区
-  std::string decompressed;
-
-  do {
-    zs.next_out = reinterpret_cast<Bytef *>(outbuffer);
-    zs.avail_out = sizeof(outbuffer);
-
-    ret = inflate(&zs, 0);
-
-    if (decompressed.size() < zs.total_out) {
-      decompressed.append(outbuffer, zs.total_out - decompressed.size());
-    }
-  } while (ret == Z_OK);
-
-  inflateEnd(&zs);
-
-  if (ret != Z_STREAM_END) {
-    throw std::runtime_error("zlib decompression failed");
-  }
-
-  return decompressed;
-}
-std::string compute_sha1(const std::string &data) {
-  unsigned char hash[SHA_DIGEST_LENGTH];
-  SHA1(reinterpret_cast<const unsigned char *>(data.data()), data.size(), hash);
-  std::stringstream ss;
-  for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
-    ss << std::hex << std::setw(2) << std::setfill('0')
-       << static_cast<int>(hash[i]);
-  }
-  return ss.str();
-}
-std::string compress_zlib(const std::string &data) {
-  z_stream zs;
-  std::fill(reinterpret_cast<char *>(&zs),
-            reinterpret_cast<char *>(&zs) + sizeof(zs), 0);
-  if (deflateInit(&zs, Z_DEFAULT_COMPRESSION) != Z_OK) {
-    throw std::runtime_error("deflateInit failed");
-  }
-  zs.next_in = (Bytef *)data.data();
-  zs.avail_in = data.size();
-  int ret;
-  char outbuffer[32768];
-  std::string compressed;
-  do {
-    zs.next_out = reinterpret_cast<Bytef *>(outbuffer);
-    zs.avail_out = sizeof(outbuffer);
-
-    ret = deflate(&zs, Z_FINISH);
-
-    if (compressed.size() < zs.total_out) {
-      compressed.append(outbuffer, zs.total_out - compressed.size());
-    }
-  } while (ret == Z_OK);
-  deflateEnd(&zs);
-  if (ret != Z_STREAM_END) {
-    throw std::runtime_error("zlib compression failed");
-  }
-  return compressed;
 }

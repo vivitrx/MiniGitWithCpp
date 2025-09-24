@@ -3,11 +3,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug git cat-file",
+      "name": "Debug git hash-object",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/git",
-      "args": ["cat-file", "-p", "74d3e5f"],
+      "args": ["hash-object", "-w", "hello.txt"],
       "stopAtEntry": false, // 是否在main函数入口暂停
       "cwd": "${workspaceFolder}", // 工作目录
       "environment": [], // 环境变量
