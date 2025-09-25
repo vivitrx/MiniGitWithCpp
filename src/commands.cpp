@@ -53,11 +53,12 @@ std::string compute_sha1(const std::string &data) {
   // SHA_DIGEST_LENGTH = 20（SHA-1产生160位=20字节哈希）
   unsigned char hash[SHA_DIGEST_LENGTH];
   // 调用OpenSSL的SHA1函数计算哈希：
-  // - 第一个参数：将输入数据的指针转换为无符号字符指针
+  // - 第一个参数：将输入数据的指针转换为无符号字符指针(把输入数据解释成字节数组)
   // - 第二个参数：输入数据的长度（字节数）
   // - 第三个参数：输出缓冲区，用于存储计算得到的哈希值
   auto input_data = reinterpret_cast<const unsigned char *>(data.data());
   SHA1(input_data, data.size(), hash);
+  // 现在你已经根据输入数据计算出一个哈希值了，哈希值就存储在 hash 里，不过你还需要把他转换成人类可读的字符串
   // 创建一个字符串流对象，用于构建十六进制格式的哈希字符串
   std::stringstream ss;
   // 循环遍历哈希结果的每个字节（共20个字节）, 最终把哈希结果转化成 string 类型
