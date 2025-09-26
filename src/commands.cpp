@@ -147,3 +147,17 @@ std::string compress_zlib(const std::string &data) {
   // 返回完整的压缩数据
   return compressed;
 }
+
+std::string GetCompressedDataFromPath(const std::string &path){
+  std::ifstream file(path, std::ios::binary);
+    if (!file) {
+      throw std::runtime_error("object not found: " + path);
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    // 读取压缩数据
+    buffer << file.rdbuf();
+    std::string compressed_data = buffer.str();
+    file.close();
+    return compressed_data;
+}

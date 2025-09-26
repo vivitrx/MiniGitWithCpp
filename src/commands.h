@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <string>
 #include <zlib.h>
+#include <fstream>    // 如果使用文件流
 std::string decompress_zlib(const std::string &compressed);
 std::string compute_sha1(const std::string &data);
 std::string compress_zlib(const std::string &data);
+std::string GetCompressedDataFromPath(const std::string &data);

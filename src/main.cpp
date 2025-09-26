@@ -1,11 +1,11 @@
 #include "commands.h" // 包含命令处理函数的声明
+#include "commands.h"
 #include "debug.h"    // 包含调试工具
-#include <iostream>  // 用于标准输入输出
-#include <stdexcept> // 用于异常处理
-#include <string>    // 用于字符串处理
 #include <filesystem> // 如果使用文件系统操作
 #include <fstream>    // 如果使用文件流
-#include "commands.h"
+#include <iostream>   // 用于标准输入输出
+#include <stdexcept>  // 用于异常处理
+#include <string>     // 用于字符串处理
 
 int main(int argc, char *argv[]) {
   // Flush after every std::cout / std::cerr
@@ -48,17 +48,7 @@ int main(int argc, char *argv[]) {
     auto hash = std::string(argv[3]);
     // dbg(hash);
     auto path = ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
-    // dbg(path);
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-      throw std::runtime_error("object not found: " + path);
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    // 读取压缩数据
-    buffer << file.rdbuf();
-    std::string compressed_data = buffer.str();
-    file.close();
+    std::string compressed_data = GetCompressedDataFromPath(path);
     // 使用 zlib 解压缩
     std::string decompressed_data = decompress_zlib(compressed_data);
     // 解析 Git object 头部并提取内容
@@ -93,7 +83,8 @@ int main(int argc, char *argv[]) {
     // 5. 压缩并写入对象文件
     std::string compressed_data = compress_zlib(blob_content);
     std::string target_file = dir_path + "/" + sha1_hash.substr(2);
-    // ​​将要以二进制模式向 target_file文件中写入数据，并且后续的所有写入操作都会保持二进制格式。​​
+    // ​​将要以二进制模式向
+    // target_file文件中写入数据，并且后续的所有写入操作都会保持二进制格式。​​
     std::ofstream out_file{target_file, std::ios::binary};
     out_file.write(compressed_data.data(), compressed_data.size());
     out_file.close();
