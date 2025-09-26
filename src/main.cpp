@@ -5,8 +5,8 @@
 #include <fstream>    // 如果使用文件流
 #include <iostream>   // 用于标准输入输出
 #include <iterator>
-#include <stdexcept>  // 用于异常处理
-#include <string>     // 用于字符串处理
+#include <stdexcept> // 用于异常处理
+#include <string>    // 用于字符串处理
 #include <vector>
 
 int main(int argc, char *argv[]) {
@@ -121,8 +121,13 @@ int main(int argc, char *argv[]) {
     if (std::string(argv[2]) == "--name-only") {
       // 只输出文件名
       for (const auto &line : ls_tree_result) {
-        const auto &name = line[line.size() - 1];
-        std::cout << name << std::endl;
+        // 找到最后一个制表符的位置
+        size_t tab_pos = line.find_last_of('\t');
+        if (tab_pos != std::string::npos) {
+          // 提取制表符后的文件名
+          std::string name = line.substr(tab_pos + 1);
+          std::cout << name << std::endl;
+        }
       }
     } else {
       // 输出全部内容
