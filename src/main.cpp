@@ -4,8 +4,10 @@
 #include <filesystem> // 如果使用文件系统操作
 #include <fstream>    // 如果使用文件流
 #include <iostream>   // 用于标准输入输出
+#include <iterator>
 #include <stdexcept>  // 用于异常处理
 #include <string>     // 用于字符串处理
+#include <vector>
 
 int main(int argc, char *argv[]) {
   // Flush after every std::cout / std::cerr
@@ -53,7 +55,9 @@ int main(int argc, char *argv[]) {
     std::string decompressed_data = decompress_zlib(compressed_data);
     // 解析 Git object 头部并提取内容
     // blob 对象文件的格式如下（经过 Zlib 解压缩后）：
-    // blob <size>\0<content>
+    /*
+    blob <size>\0<content>
+    */
     size_t null_position = decompressed_data.find('\0');
     if (null_position == std::string::npos) {
       throw std::runtime_error("invalid git object format!");
@@ -90,6 +94,42 @@ int main(int argc, char *argv[]) {
     out_file.close();
     // 6. 输出完整的 SHA-1 哈希
     std::cout << sha1_hash << std::flush;
+    return 0;
+  } else if ((argc == 4 && std::string(argv[1]) == "ls-tree")) {
+    // ls-tree --name-only <tree_sha>
+    std::string tree_hash = std::string(argv[3]);
+    auto path =
+        ".git/objects/" + tree_hash.substr(0, 2) + "/" + tree_hash.substr(2);
+    // 读取并解压数据
+    std::string compressed_data = GetCompressedDataFromPath(path);
+    std::string decompressed_data = decompress_zlib(compressed_data);
+    // 解析头部: "tree <size>\0"
+    size_t null_pos = decompressed_data.find('\0');
+    if (null_pos == std::string::npos) {
+      throw std::runtime_error("Invalid git object format!");
+    }
+    std::string header = decompressed_data.substr(0, null_pos);
+    // 验证这是树对象
+    if (header.substr(0, 5) != "tree ") {
+      throw std::runtime_error("Not a tree object!");
+    }
+    // 剩余内容是条目数据
+    std::string entries_data = decompressed_data.substr(null_pos + 1);
+    // 解析并获取文件名
+    std::vector<std::string> ls_tree_result =
+        ParseTreeObjectEntries(entries_data);
+    if (std::string(argv[2]) == "--name-only") {
+      // 只输出文件名
+      for (const auto &line : ls_tree_result) {
+        const auto &name = line[line.size() - 1];
+        std::cout << name << std::endl;
+      }
+    } else {
+      // 输出全部内容
+      for (const auto &line : ls_tree_result) {
+        std::cout << line << std::endl;
+      }
+    }
     return 0;
   } else {
     std::cerr << "Unknown command " << command << '\n';

@@ -1,4 +1,5 @@
 #include "commands.h"
+#include <string>
 
 /**
  * @brief 使用zlib解压缩数据
@@ -53,12 +54,14 @@ std::string compute_sha1(const std::string &data) {
   // SHA_DIGEST_LENGTH = 20（SHA-1产生160位=20字节哈希）
   unsigned char hash[SHA_DIGEST_LENGTH];
   // 调用OpenSSL的SHA1函数计算哈希：
-  // - 第一个参数：将输入数据的指针转换为无符号字符指针(把输入数据解释成字节数组)
+  // -
+  // 第一个参数：将输入数据的指针转换为无符号字符指针(把输入数据解释成字节数组)
   // - 第二个参数：输入数据的长度（字节数）
   // - 第三个参数：输出缓冲区，用于存储计算得到的哈希值
   auto input_data = reinterpret_cast<const unsigned char *>(data.data());
   SHA1(input_data, data.size(), hash);
-  // 现在你已经根据输入数据计算出一个哈希值了，哈希值就存储在 hash 里，不过你还需要把他转换成人类可读的字符串
+  // 现在你已经根据输入数据计算出一个哈希值了，哈希值就存储在 hash
+  // 里，不过你还需要把他转换成人类可读的字符串
   // 创建一个字符串流对象，用于构建十六进制格式的哈希字符串
   std::stringstream ss;
   // 循环遍历哈希结果的每个字节（共20个字节）, 最终把哈希结果转化成 string 类型
@@ -148,16 +151,91 @@ std::string compress_zlib(const std::string &data) {
   return compressed;
 }
 
-std::string GetCompressedDataFromPath(const std::string &path){
+std::string GetCompressedDataFromPath(const std::string &path) {
   std::ifstream file(path, std::ios::binary);
-    if (!file) {
-      throw std::runtime_error("object not found: " + path);
+  if (!file) {
+    throw std::runtime_error("object not found: " + path);
+  }
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  // 读取压缩数据
+  buffer << file.rdbuf();
+  std::string compressed_data = buffer.str();
+  file.close();
+  return compressed_data;
+}
+
+/**
+ * @brief 解析树对象条目数据并生成 git ls-tree 格式的输出
+ *
+ * 处理格式为：<mode> <name>\0<20_byte_binary_sha> 的条目序列
+ * 将二进制SHA转换为十六进制，根据mode推断类型(blob/tree)
+ * 生成 "mode type sha\tname" 格式的输出字符串
+ *
+ * @param entries_data 树对象的条目数据（去除头部后的二进制数据）
+ * @return 格式化后的ls-tree输出行向量
+ */
+std::vector<std::string>
+ParseTreeObjectEntries(const std::string &entries_data) {
+  std::vector<std::string> ls_tree_result;
+  size_t offset = 0;
+  /*
+  树对象内容的格式
+  <mode> <name>\0<20_byte_sha>
+  <mode> <name>\0<20_byte_sha>
+  */
+  while (offset < entries_data.size()) {
+    // 找到 <mode>标签 结束的位置（空格）
+    size_t space_pos = entries_data.find(' ', offset);
+    if (space_pos == std::string::npos)
+      break;
+
+    // 提取 <mode>标签
+    std::string mode = entries_data.substr(offset, space_pos - offset);
+    offset = space_pos + 1;
+
+    // 找到文件名 <name> 结束的位置（空字符）
+    size_t null_pos = entries_data.find('\0', offset);
+    if (null_pos == std::string::npos)
+      break;
+
+    // 提取文件名
+    std::string name = entries_data.substr(offset, null_pos - offset);
+    offset = null_pos + 1;
+
+    // 检查边界
+    if (offset + 20 > entries_data.size()) {
+      break;
     }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    // 读取压缩数据
-    buffer << file.rdbuf();
-    std::string compressed_data = buffer.str();
-    file.close();
-    return compressed_data;
+
+    // 提取20字节的二进制SHA
+    std::string binary_sha = entries_data.substr(offset, 20);
+    offset += 20;
+
+    // 将二进制SHA转换为十六进制字符串
+    std::string hex_sha;
+    for (unsigned char c : binary_sha) {
+      char hex[3];
+      snprintf(hex, sizeof(hex), "%02x", c);
+      hex_sha += hex;
+    }
+
+    // 根据mode推断类型
+    std::string type;
+    if (mode == "100644" || mode == "100755" || mode == "120000") {
+      type = "blob";
+    } else if (mode == "40000") {
+      type = "tree";
+    } else {
+      type = "unknown"; // 处理未知类型
+    }
+
+    // 构建完整的 ls-tree 输出行
+    std::string ls_tree_line = mode + " " + type + " " + hex_sha + "\t" + name;
+
+    // 保存结果
+    ls_tree_result.push_back(ls_tree_line);
+  }
+
+  return ls_tree_result;
 }

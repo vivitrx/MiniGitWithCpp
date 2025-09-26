@@ -7,7 +7,29 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/git",
-      "args": ["hash-object", "-w", "hello.txt"],
+      "args": [
+        "cat-file",
+        "-p",
+        "9be7e6040d9fbf9c2270b936670909e6f130d128"
+      ],
+      "stopAtEntry": false, // 是否在main函数入口暂停
+      "cwd": "${workspaceFolder}", // 工作目录
+      "environment": [], // 环境变量
+      "externalConsole": false, // 使用集成终端
+      "MIMode": "gdb", // 调试器类型
+      "miDebuggerPath": "/usr/bin/gdb", // GDB路径
+      "preLaunchTask": "build-project" // 调试前执行构建任务
+    },
+    {
+      "name": "Debug git ls-tree --name-only",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/git",
+      "args": [
+        "ls-tree",
+        "--name-only",
+        "9be7e6040d9fbf9c2270b936670909e6f130d128"
+      ],
       "stopAtEntry": false, // 是否在main函数入口暂停
       "cwd": "${workspaceFolder}", // 工作目录
       "environment": [], // 环境变量
