@@ -1,4 +1,6 @@
 #include "commands.h"
+#include <algorithm>
+#include <set>
 #include <string>
 
 /**
@@ -264,7 +266,7 @@ std::string GenerateBlobObjectForFile(std::string file_name) {
   out_file.close();
   return sha1_hash;
 }
-int HandleLsTreeCommand(int argc, char *argv[]) {
+int ls_tree(int argc, char *argv[]) {
   std::string tree_hash = std::string(argv[3]);
   auto path =
       ".git/objects/" + tree_hash.substr(0, 2) + "/" + tree_hash.substr(2);
@@ -308,18 +310,18 @@ int HandleLsTreeCommand(int argc, char *argv[]) {
  * @return 对象类型字符串（"blob", "tree", "commit", "tag"）
  * @throws std::runtime_error 如果对象格式无效
  */
- std::string GetGitObjectType(const std::string& decompressed_data) {
+std::string GetGitObjectType(const std::string &decompressed_data) {
   size_t null_pos = decompressed_data.find('\0');
   if (null_pos == std::string::npos) {
-      throw std::runtime_error("Invalid git object format!");
+    throw std::runtime_error("Invalid git object format!");
   }
-  
+
   std::string header = decompressed_data.substr(0, null_pos);
   size_t space_pos = header.find(' ');
   if (space_pos == std::string::npos) {
-      throw std::runtime_error("Invalid git object header format!");
+    throw std::runtime_error("Invalid git object header format!");
   }
-  
+
   return header.substr(0, space_pos);
 }
 std::string GetBlobContentFromInputHash(const std::string hash) {
@@ -335,4 +337,141 @@ std::string GetBlobContentFromInputHash(const std::string hash) {
   std::string blob_header = decompressed_data.substr(0, null_position);
   std::string blob_content = decompressed_data.substr(null_position + 1);
   return blob_content;
+}
+
+std::string GenerateTreeObjectForDirectory(const std::string &dir_path) {
+  std::vector<TreeEntry> entries;
+  // 遍历目录中的所有条目
+  for (const auto &entry_name : GetListOfDirectoryContents(dir_path)) {
+    std::string entry_path = dir_path + "/" + entry_name;
+    // 跳过 .git 目录和其他需要忽略的文件
+    if (ShouldIgnoreEntry(entry_name)) {
+      continue;
+    }
+    if (std::filesystem::is_directory(entry_name)) {
+      // 递归处理子目录
+      std::string sub_tree_hash = GenerateTreeObjectForDirectory(entry_path);
+      entries.push_back({"40000", entry_name, sub_tree_hash, "tree"});
+    } else {
+      // 处理文件
+      std::string blob_hash = GenerateBlobObjectForFile(entry_path);
+      std::string mode = GetFileMode(entry_path); // 100644, 100755 等
+      entries.push_back({mode, entry_name, blob_hash, "blob"});
+    }
+  }
+  // 按Git要求的顺序排序条目（树对象在前，按名称排序）
+  SortEntries(entries);
+  // 创建并写入树对象
+  return CreateAndWriteTreeObject(entries);
+}
+/**
+ * @brief 按Git要求的顺序排序条目（树对象在前，按名称排序）
+ *
+ * Git树对象排序规则：
+ * 1. 树对象（目录）排在数据对象（文件）前面
+ * 2. 同类对象按名称字典序排序
+ * 3. 名称比较区分大小写
+ *
+ * @param entries 要排序的条目向量
+ */
+void SortEntries(std::vector<TreeEntry> &entries) {
+  std::sort(entries.begin(), entries.end(),
+            [](const TreeEntry &a, const TreeEntry &b) {
+              // 优先按对象类型排序：树对象（040000）在前
+              bool a_is_tree = (a.mode == "040000");
+              bool b_is_tree = (b.mode == "040000");
+
+              if (a_is_tree && !b_is_tree) {
+                return true; // a是树对象，b不是，a排在前面
+              } else if (!a_is_tree && b_is_tree) {
+                return false; // b是树对象，a不是，b排在前面
+              } else {
+                // 同类对象，按名称字典序排序
+                return a.entry_name < b.entry_name;
+              }
+            });
+}
+
+std::string GetFileMode(const std::string ep) {
+  const std::filesystem::path &entry_path = ep;
+  std::error_code ec;
+
+  if (std::filesystem::is_directory(entry_path, ec)) {
+    if (ec) {
+      throw std::runtime_error("无法访问目录: " + ec.message());
+    }
+    return "040000";
+  }
+
+  if (std::filesystem::is_regular_file(entry_path, ec)) {
+    if (ec) {
+      throw std::runtime_error("无法访问文件: " + ec.message());
+    }
+    // 检查执行权限
+    auto perms = std::filesystem::status(entry_path).permissions();
+    namespace fs = std::filesystem;
+    if ((perms & fs::perms::owner_exec) != fs::perms::none ||
+        (perms & fs::perms::group_exec) != fs::perms::none ||
+        (perms & fs::perms::others_exec) != fs::perms::none) {
+      return "100755";
+    }
+    return "100644";
+  }
+  if (std::filesystem::is_symlink(entry_path, ec)) {
+    if (!ec)
+      return "120000";
+  }
+  throw std::runtime_error("无法识别的文件类型: " + entry_path.string());
+}
+
+/**
+ * @brief 检查条目是否应该被忽略
+ *
+ * @param entry_name 条目名称
+ * @param entry_path 条目完整路径（可选，用于更复杂的忽略规则）
+ * @return true 应该忽略此条目
+ * @return false 不应该忽略此条目
+ */
+bool ShouldIgnoreEntry(const std::string &entry_name) {
+  static const std::set<std::string> ignored_entries{
+      ".git", ".DS_Store", "Thumbs.db", ".vscode", ".idea", "__pycache__"};
+  // 忽略以 . 开头的隐藏文件
+  if (entry_name[0] == '.') {
+    return true;
+  }
+  // 检查忽略列表
+  return ignored_entries.find(entry_name) != ignored_entries.end();
+}
+/**
+ * @brief 列出指定目录下的所有文件和子目录名称
+ *
+ * @param path
+ * @return std::vector<std::string>
+ */
+std::vector<std::string> GetListOfDirectoryContents(const std::string &path) {
+  std::vector<std::string> entries;
+  for (const auto &entry_name : std::filesystem::directory_iterator(path)) {
+    entries.push_back(
+        {entry_name.path().filename().string(), entry_name.is_directory()});
+  }
+  return entries;
+}
+/**
+ * @brief Create a And Write Tree Object object
+ *
+ * @param entries
+ * @return std::string 返回一个 SHA1 哈希
+ */
+std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
+  // 1. 先构建所有条目内容
+  std::string content;
+  for (const auto &entry : entries) {
+    // 每个条目：mode + space + name + null + hash
+    content += entry.mode + " " + entry.entry_name + '\0';
+    content.append(entry.hash.begin(), entry.hash.end()); // 20字节二进制哈希
+  }
+  // 2. 构建头部：tree + space + size + null
+  std::string header = "tree " + std::to_string(content.size()) + '\0';
+  // 3. 组合完整对象
+  return header + content;
 }

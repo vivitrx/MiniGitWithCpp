@@ -1,13 +1,9 @@
 #include "commands.h" // 包含命令处理函数的声明
-#include "commands.h"
 #include "debug.h"    // 包含调试工具
 #include <filesystem> // 如果使用文件系统操作
 #include <fstream>    // 如果使用文件流
 #include <iostream>   // 用于标准输入输出
-#include <iterator>
-#include <stdexcept> // 用于异常处理
-#include <string>    // 用于字符串处理
-#include <vector>
+#include <string>     // 用于字符串处理
 
 int main(int argc, char *argv[]) {
   // Flush after every std::cout / std::cerr
@@ -59,7 +55,14 @@ int main(int argc, char *argv[]) {
     return 0;
   } else if ((std::string(argv[1]) == "ls-tree")) {
     // ls-tree --name-only <tree_sha>
-    return HandleLsTreeCommand(argc, argv);
+    return ls_tree(argc, argv);
+  } else if (std::string(argv[1]) == "write-tree") {
+    // 获取当前工作目录
+    auto current_dir = std::filesystem::current_path().string();
+    // 递归生成当前目录的树对象
+    std::string root_tree_hash = GenerateTreeObjectForDirectory(current_dir);
+    std::cout << root_tree_hash << std::endl;
+    return 0;
   } else {
     std::cerr << "Unknown command " << command << '\n';
     return EXIT_FAILURE;
