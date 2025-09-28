@@ -377,54 +377,42 @@ std::string GenerateTreeObjectForDirectory(const std::string &dir_path) {
 void SortEntries(std::vector<TreeEntry> &entries) {
   std::sort(entries.begin(), entries.end(),
             [](const TreeEntry &a, const TreeEntry &b) {
-              // 优先按对象类型排序：树对象（040000）在前
-              bool a_is_tree = (a.mode == "040000");
-              bool b_is_tree = (b.mode == "040000");
-
-              if (a_is_tree && !b_is_tree) {
-                return true; // a是树对象，b不是，a排在前面
-              } else if (!a_is_tree && b_is_tree) {
-                return false; // b是树对象，a不是，b排在前面
-              } else {
-                // 同类对象，按名称字典序排序
-                return a.entry_name < b.entry_name;
-              }
+              return a.entry_name < b.entry_name; // 严格ASCII排序
             });
 }
 
-std::string GetFileMode(const std::string ep) {
-  const std::filesystem::path &entry_path = ep;
+std::string GetFileMode(const fs::path &entry_path) {
   std::error_code ec;
-
-  if (std::filesystem::is_directory(entry_path, ec)) {
-    if (ec) {
-      throw std::runtime_error("无法访问目录: " + ec.message());
-    }
+  namespace fs = std::filesystem;
+  // 1. 检查目录
+  if (fs::is_directory(entry_path, ec)) {
+    if (ec)
+      throw std::runtime_error("目录访问错误: " + ec.message());
     return "040000";
   }
-
-  if (std::filesystem::is_regular_file(entry_path, ec)) {
-    if (ec) {
-      throw std::runtime_error("无法访问文件: " + ec.message());
-    }
+  // 2. 检查普通文件
+  if (fs::is_regular_file(entry_path, ec)) {
+    if (ec)
+      throw std::runtime_error("文件访问错误: " + ec.message());
     // 检查执行权限
-    auto perms = std::filesystem::status(entry_path).permissions();
-    namespace fs = std::filesystem;
-    if ((perms & fs::perms::owner_exec) != fs::perms::none ||
-        (perms & fs::perms::group_exec) != fs::perms::none ||
-        (perms & fs::perms::others_exec) != fs::perms::none) {
-      return "100755";
-    }
-    return "100644";
-  }
-  if (std::filesystem::is_symlink(entry_path, ec)) {
-    if (!ec)
-      return "120000";
-  }
-  // 默认返回普通文件模式（不再抛出异常）
-  return "100644";
-}
+    auto file_status = fs::status(entry_path, ec);
+    if (ec)
+      throw std::runtime_error("无法获取文件状态: " + ec.message());
 
+    const auto perms = file_status.permissions();
+    constexpr auto exec_mask =
+        fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec;
+    return (perms & exec_mask) != fs::perms::none ? "100755" : "100644";
+  }
+  // 3. 检查符号链接
+  if (fs::is_symlink(entry_path, ec)) {
+    if (ec)
+      throw std::runtime_error("符号链接访问错误: " + ec.message());
+    return "120000";
+  }
+  // 4. 其他类型（设备文件、管道等）
+  return "100644"; // 默认视为普通文件
+}
 /**
  * @brief 检查条目是否应该被忽略
  *
