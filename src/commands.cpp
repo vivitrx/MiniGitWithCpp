@@ -473,7 +473,17 @@ std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
   }
   // 2. 构建头部：tree + space + size + null
   std::string header = "tree " + std::to_string(content.size()) + '\0';
-  // 3. 组合完整对象
+  // 3. 组合完整对象, 获取hash
   auto hash = compute_sha1(header + content);
+  // 4. 压缩并写入对象文件
+  // 往.git/objects/file_dir/file_name里写入content;
+  auto file_dir = ".git/objects/" + hash.substr(0, 2);
+  std::filesystem::create_directories(file_dir);
+  auto file_name = hash.substr(2);
+  std::string compressed_data = compress_zlib(content);
+  std::string target_file = file_dir + "/" + file_name;
+  std::ofstream out_file{target_file, std::ios::binary};
+  out_file.write(compressed_data.data(), compressed_data.size());
+  out_file.close();
   return hash;
 }
