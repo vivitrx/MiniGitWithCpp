@@ -421,7 +421,8 @@ std::string GetFileMode(const std::string ep) {
     if (!ec)
       return "120000";
   }
-  throw std::runtime_error("无法识别的文件类型: " + entry_path.string());
+  // 默认返回普通文件模式（不再抛出异常）
+  return "100644"; 
 }
 
 /**
