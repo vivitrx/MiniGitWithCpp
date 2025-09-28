@@ -381,7 +381,8 @@ void SortEntries(std::vector<TreeEntry> &entries) {
             });
 }
 
-std::string GetFileMode(const fs::path &entry_path) {
+std::string GetFileMode(const std::string ep) {
+  const std::filesystem::path &entry_path = ep;
   std::error_code ec;
   namespace fs = std::filesystem;
   // 1. 检查目录
