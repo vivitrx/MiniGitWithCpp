@@ -476,11 +476,11 @@ std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
   // 3. 组合完整对象, 获取hash
   auto hash = compute_sha1(header + content);
   // 4. 压缩并写入对象文件
-  // 往.git/objects/file_dir/file_name里写入content;
+  // 往.git/objects/file_dir/file_name里写入 header + content ;
   auto file_dir = ".git/objects/" + hash.substr(0, 2);
   std::filesystem::create_directories(file_dir);
   auto file_name = hash.substr(2);
-  std::string compressed_data = compress_zlib(content);
+  std::string compressed_data = compress_zlib(header + content);
   std::string target_file = file_dir + "/" + file_name;
   std::ofstream out_file{target_file, std::ios::binary};
   out_file.write(compressed_data.data(), compressed_data.size());
