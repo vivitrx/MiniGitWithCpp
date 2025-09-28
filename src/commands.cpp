@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <set>
 #include <string>
-
+namespace fs = std::filesystem;
 /**
  * @brief 使用zlib解压缩数据
  * @param compressed 待解压的字符串
@@ -381,38 +381,28 @@ void SortEntries(std::vector<TreeEntry> &entries) {
             });
 }
 
-std::string GetFileMode(const std::string ep) {
-  const std::filesystem::path &entry_path = ep;
+std::string GetFileMode(const std::string string_path) {
+  const fs::path &path = string_path;
   std::error_code ec;
-  namespace fs = std::filesystem;
-  // 1. 检查目录
-  if (fs::is_directory(entry_path, ec)) {
-    if (ec)
-      throw std::runtime_error("目录访问错误: " + ec.message());
-    return "040000";
-  }
-  // 2. 检查普通文件
-  if (fs::is_regular_file(entry_path, ec)) {
-    if (ec)
-      throw std::runtime_error("文件访问错误: " + ec.message());
-    // 检查执行权限
-    auto file_status = fs::status(entry_path, ec);
-    if (ec)
-      throw std::runtime_error("无法获取文件状态: " + ec.message());
 
-    const auto perms = file_status.permissions();
-    constexpr auto exec_mask =
-        fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec;
-    return (perms & exec_mask) != fs::perms::none ? "100755" : "100644";
+  if (fs::is_directory(path, ec)) {
+    if (!ec)
+      return "040000";
   }
-  // 3. 检查符号链接
-  if (fs::is_symlink(entry_path, ec)) {
-    if (ec)
-      throw std::runtime_error("符号链接访问错误: " + ec.message());
-    return "120000";
+
+  if (fs::is_symlink(path, ec)) {
+    if (!ec)
+      return "120000";
   }
-  // 4. 其他类型（设备文件、管道等）
-  return "100644"; // 默认视为普通文件
+
+  auto file_status = fs::status(path, ec);
+  if (ec)
+    return "100644"; // 默认安全值
+
+  // 正确检查执行权限位的方法
+  return (file_status.permissions() & fs::perms::owner_exec) != fs::perms::none
+             ? "100755"
+             : "100644";
 }
 /**
  * @brief 检查条目是否应该被忽略
