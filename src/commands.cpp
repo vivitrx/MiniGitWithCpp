@@ -422,7 +422,7 @@ std::string GetFileMode(const std::string ep) {
       return "120000";
   }
   // 默认返回普通文件模式（不再抛出异常）
-  return "100644"; 
+  return "100644";
 }
 
 /**
@@ -474,5 +474,6 @@ std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
   // 2. 构建头部：tree + space + size + null
   std::string header = "tree " + std::to_string(content.size()) + '\0';
   // 3. 组合完整对象
-  return header + content;
+  auto hash = compute_sha1(header + content);
+  return hash;
 }
