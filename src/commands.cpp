@@ -450,7 +450,9 @@ std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
   for (const auto &entry : entries) {
     // 每个条目：mode + space + name + null + hash
     if (entry.hash.size() != 20) {
-      throw std::runtime_error("Invalid hash length for: " + entry.entry_name);
+      throw std::runtime_error(
+          "Invalid hash length for: " + entry.entry_name +
+          "which hash lenth is:" + std::to_string(entry.hash.size()));
     }
     content += entry.mode + " " + entry.entry_name + '\0';
     content.append(entry.hash.begin(), entry.hash.end()); // 20字节二进制哈希
