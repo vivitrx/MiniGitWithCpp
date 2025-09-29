@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     return ls_tree(argc, argv);
   } else if (std::string(argv[1]) == "write-tree") {
     // 获取当前工作目录
-    auto current_dir = std::filesystem::current_path().string();
+    std::string current_dir = std::filesystem::current_path().string();
     // 递归生成当前目录的树对象
     std::string root_tree_hash = GenerateTreeObjectForDirectory(current_dir);
     std::cout << root_tree_hash << std::endl;

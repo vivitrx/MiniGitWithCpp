@@ -1,5 +1,7 @@
 #include "commands.h"
 #include <algorithm>
+#include <iostream>
+#include <ostream>
 #include <set>
 #include <string>
 namespace fs = std::filesystem;
@@ -431,38 +433,42 @@ bool ShouldIgnoreEntry(const std::string &entry_name) {
 std::vector<std::string> GetListOfDirectoryContents(const std::string &path) {
   std::vector<std::string> entries;
   for (const auto &entry_name : std::filesystem::directory_iterator(path)) {
-    entries.push_back(
-        {entry_name.path().filename().string(), entry_name.is_directory()});
+    std::cerr << entry_name.path().filename().string() << std::flush;
+    entries.push_back(entry_name.path().filename().string());
   }
   return entries;
 }
 /**
- * @brief Create a And Write Tree Object object
- *
- * @param entries
- * @return std::string 返回一个 SHA1 哈希
+ * @brief 创建并写入Git树对象
+ * @param entries 待处理的条目列表（需确保hash为20字节二进制）
+ * @return std::string 40字符的SHA-1哈希
+ * @throws std::runtime_error 如果输入无效或文件操作失败
  */
 std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
-  // 1. 先构建所有条目内容
+  // 1. 构建所有条目内容
   std::string content;
   for (const auto &entry : entries) {
     // 每个条目：mode + space + name + null + hash
+    if (entry.hash.size() != 20) {
+      throw std::runtime_error("Invalid hash length for: " + entry.entry_name);
+    }
     content += entry.mode + " " + entry.entry_name + '\0';
     content.append(entry.hash.begin(), entry.hash.end()); // 20字节二进制哈希
   }
-  // 2. 构建头部：tree + space + size + null
+  // 2. 构建完整对象
   std::string header = "tree " + std::to_string(content.size()) + '\0';
-  // 3. 组合完整对象, 获取hash
-  auto hash = compute_sha1(header + content);
-  // 4. 压缩并写入对象文件
-  // 往.git/objects/file_dir/file_name里写入 header + content ;
-  auto file_dir = ".git/objects/" + hash.substr(0, 2);
-  std::filesystem::create_directories(file_dir);
-  auto file_name = hash.substr(2);
-  std::string compressed_data = compress_zlib(header + content);
-  std::string target_file = file_dir + "/" + file_name;
-  std::ofstream out_file{target_file, std::ios::binary};
-  out_file.write(compressed_data.data(), compressed_data.size());
-  out_file.close();
+  std::string tree_obj = header + content;
+  // 3. 计算哈希并存储
+  auto hash = compute_sha1(tree_obj);
+  std::string obj_path =
+      ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
+  std::ofstream out(obj_path, std::ios::binary);
+  if (!out) {
+    throw std::runtime_error("Cannot open: " + obj_path);
+  }
+  std::string compressed = compress_zlib(tree_obj);
+  if (!out.write(compressed.data(), compressed.size())) {
+    throw std::runtime_error("Write failed: " + obj_path);
+  }
   return hash;
 }
