@@ -626,56 +626,12 @@ auto TreeEntry::PrintTreeObjectEntries() const -> void {
  * 2. 如果输入长度=40且全为十六进制字符 → 转换hex→bin
  * 3. 其他情况抛出异常
  */
-std::string HexToBin(const std::string &input) {
-  // 空输入检查
-  if (input.empty()) {
-    throw std::invalid_argument("Input string is empty");
+std::string HexToBin(const std::string &hex) {
+  std::string bytes;
+  for (size_t i = 0; i < hex.length(); i += 2) {
+    std::string byte_string = hex.substr(i, 2);
+    char byte = static_cast<char>(strtol(byte_string.c_str(), nullptr, 16));
+    bytes.push_back(byte);
   }
-
-  // 情况1：可能是20字节二进制数据
-  if (input.size() == 20) {
-    bool is_binary = true;
-    for (char c : input) {
-      if (static_cast<unsigned char>(c) >= 128) {
-        is_binary = false;
-        break;
-      }
-    }
-    if (is_binary)
-      return input; // 直接返回二进制数据
-  }
-
-  // 情况2：40字符十六进制
-  if (input.size() == 40) {
-    auto is_hex = [](char c) {
-      c = tolower(c);
-      return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-    };
-
-    if (std::all_of(input.begin(), input.end(), is_hex)) {
-      std::string binary;
-      binary.reserve(20);
-
-      for (size_t i = 0; i < 40; i += 2) {
-        auto char_to_val = [](char c) -> int {
-          c = tolower(c);
-          return (c >= '0' && c <= '9') ? c - '0' : 10 + c - 'a';
-        };
-
-        unsigned char byte =
-            (char_to_val(input[i]) << 4) | char_to_val(input[i + 1]);
-        binary.push_back(static_cast<char>(byte));
-      }
-      return binary;
-    }
-  }
-
-  // 情况3：无效输入
-  throw std::invalid_argument(
-      "Input must be either:\n"
-      "1. 20-byte binary string (all chars < 128)\n"
-      "2. 40-char hex string\n"
-      "Got: " +
-      std::to_string(input.size()) + " bytes with first byte: 0x" +
-      (input.empty() ? "null" : std::to_string(static_cast<int>(input[0]))));
+  return bytes;
 }
