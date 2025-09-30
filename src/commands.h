@@ -8,8 +8,10 @@
 #include <sstream>
 #include <string>
 // 对于 compress_zlib
+#include <bitset>     // 必须包含这个头文件
 #include <filesystem> // 如果使用文件系统操作
 #include <fstream>    // 如果使用文件流
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -17,6 +19,12 @@
 #include <unistd.h>
 #include <vector>
 #include <zlib.h>
+// 宏
+#define THROW_ERROR(msg)                                                       \
+  throw std::runtime_error(std::string(__FILE__) + ":" +                       \
+                           std::to_string(__LINE__) + " in " + __func__ +      \
+                           "(): " + msg)
+//
 std::string decompress_zlib(const std::string &compressed);
 std::string compute_sha1(const std::string &data);
 std::string compress_zlib(const std::string &data);
@@ -43,6 +51,8 @@ struct TreeEntry {
   std::string entry_name;
   std::string hash;
   std::string entry_type;
+  // for debug
+  auto PrintTreeObjectEntries() const -> void;
 };
 std::string GetCurrentWorkingDirectory();
 std::string GenerateTreeObjectForDirectory(const std::string &dir_path);
@@ -55,3 +65,5 @@ std::string
 CreateAndWriteTreeObject(std::vector<TreeEntry> entries); // 返回一个 SHA1 哈希
 
 std::vector<std::string> GetListOfDirectoryContents(const std::string &path);
+
+std::string HexToBin(const std::string &hex_str);

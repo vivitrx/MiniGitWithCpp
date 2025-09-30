@@ -154,14 +154,24 @@ std::string compress_zlib(const std::string &data) {
   // 返回完整的压缩数据
   return compressed;
 }
-
+/**
+ * @brief 从指定路径读取压缩的Git对象数据
+ *
+ * 该函数用于读取Git对象存储中的压缩数据文件（通常位于.git/objects目录下）。
+ * 文件内容为经过zlib压缩的Git对象数据。
+ *
+ * @param path 要读取的文件路径（格式为.git/objects/xx/xxxx...）
+ * @return std::string 包含原始压缩数据的字符串
+ * @throws std::runtime_error 当文件不存在或无法打开时抛出异常
+ *
+ * @note 返回的是原始压缩数据，需要调用zlib解压才能获取实际对象内容
+ */
 std::string GetCompressedDataFromPath(const std::string &path) {
   std::ifstream file(path, std::ios::binary);
   if (!file) {
     throw std::runtime_error("object not found: " + path);
   }
   std::stringstream buffer;
-  buffer << file.rdbuf();
   // 读取压缩数据
   buffer << file.rdbuf();
   std::string compressed_data = buffer.str();
@@ -243,6 +253,25 @@ ParseTreeObjectEntries(const std::string &entries_data) {
 
   return ls_tree_result;
 }
+/**
+ * @brief 为指定文件生成Git blob对象并存储到对象数据库
+ *
+ * 该函数实现了Git核心的blob对象创建流程，包含以下步骤：
+ * 1. 读取文件原始内容
+ * 2. 构建符合Git规范的blob对象（头部+内容）
+ * 3. 计算SHA-1哈希作为对象ID
+ * 4. 将压缩后的对象存入.git/objects
+ *
+ * @param file_name 要处理的文件路径
+ * @return std::string 40字符的SHA-1哈希值（小写十六进制）
+ * @throws std::runtime_error 当文件读取失败时抛出异常
+ *
+ * @note 生成的blob对象格式：
+ *       "blob {content_size}\0{file_content}"
+ * @warning 文件路径必须是有效可读的，且文件大小不能超过系统限制
+ * @see
+ * Git对象存储规范：https://git-scm.com/book/en/v2/Git-Internals-Git-Objects
+ */
 std::string GenerateBlobObjectForFile(std::string file_name) {
   std::ifstream file(file_name, std::ios::binary);
   auto file_begin = std::istreambuf_iterator<char>(file);
@@ -268,6 +297,28 @@ std::string GenerateBlobObjectForFile(std::string file_name) {
   out_file.close();
   return sha1_hash;
 }
+/**
+ * @brief 解析并输出Git树对象内容
+ *
+ * 实现`git ls-tree`命令的核心功能，支持两种输出模式：
+ * 1. 完整模式：显示所有条目信息（模式、类型、哈希、文件名）
+ * 2. 精简模式(--name-only)：仅显示文件名
+ *
+ * @param argc 参数个数（必须≥4，如：ls-tree --name-only <tree-hash>）
+ * @param argv 参数数组
+ * @return int 执行状态码（0成功，非0失败）
+ * @throws std::runtime_error 当出现以下情况时抛出异常：
+ *         - 参数不足
+ *         - 对象类型不是tree
+ *         - 对象文件不存在
+ *
+ * @note 树对象格式：
+ *       "tree <content_size>\0<entries_data>"
+ *       entries_data格式：
+ *       "<mode> <name>\0<20-byte-hash><mode> <name>\0<20-byte-hash>..."
+ * @warning 需要确保.git/objects目录结构符合Git规范
+ * @see Git树对象规范：https://git-scm.com/book/en/v2/Git-Internals-Git-Objects
+ */
 int ls_tree(int argc, char *argv[]) {
   std::string tree_hash = std::string(argv[3]);
   auto path =
@@ -326,6 +377,26 @@ std::string GetGitObjectType(const std::string &decompressed_data) {
 
   return header.substr(0, space_pos);
 }
+/**
+ * @brief 从Git对象哈希中提取blob对象内容
+ *
+ * 该函数通过给定的40字符SHA-1哈希值，从Git对象数据库中获取对应的blob对象，
+ * 并返回其原始内容（不包含Git对象头部信息）。
+ *
+ * @param hash 40字符的blob对象SHA-1哈希（小写十六进制）
+ * @return std::string blob对象的原始内容
+ * @throws std::runtime_error 当出现以下情况时抛出异常：
+ *         - 对象文件不存在或无法读取
+ *         - 解压缩失败
+ *         - 对象格式无效（缺少空字符分隔符）
+ *         - 对象类型不是blob（未显式检查）
+ *
+ * @note blob对象存储格式：
+ *       "blob <content_size>\0<file_content>"
+ * @warning 函数不会验证对象类型是否为blob，调用方需确保输入的是合法blob哈希
+ * @see
+ * Git对象存储规范：https://git-scm.com/book/en/v2/Git-Internals-Git-Objects
+ */
 std::string GetBlobContentFromInputHash(const std::string hash) {
   auto path = ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
   std::string compressed_data = GetCompressedDataFromPath(path);
@@ -340,7 +411,28 @@ std::string GetBlobContentFromInputHash(const std::string hash) {
   std::string blob_content = decompressed_data.substr(null_position + 1);
   return blob_content;
 }
-
+/**
+ * @brief 为指定目录生成Git树对象并递归处理所有子目录
+ *
+ * 该函数实现了Git树对象的递归生成过程，模拟`git add`的行为：
+ * 1. 遍历目录中的所有文件和子目录
+ * 2. 递归处理子目录生成子树对象
+ * 3. 为文件生成blob对象
+ * 4. 按Git规范排序条目并创建最终的树对象
+ *
+ * @param dir_path 要处理的目录路径
+ * @return std::string 40字符的树对象SHA-1哈希（小写十六进制）
+ * @throws std::runtime_error 当出现以下情况时抛出异常：
+ *         - 目录不存在或无法访问
+ *         - 文件读取失败
+ *         - 对象存储失败
+ *
+ * @note 树对象条目排序规则：
+ *       1. 树对象（目录）在前，数据对象（文件）在后
+ *       2. 同类对象按名称ASCII码排序
+ * @warning 会跳过.gitignore中指定的文件和目录
+ * @see Git树对象规范：https://git-scm.com/book/en/v2/Git-Internals-Git-Objects
+ */
 std::string GenerateTreeObjectForDirectory(const std::string &dir_path) {
   std::vector<TreeEntry> entries;
   // 遍历目录中的所有条目
@@ -353,12 +445,12 @@ std::string GenerateTreeObjectForDirectory(const std::string &dir_path) {
     if (std::filesystem::is_directory(entry_name)) {
       // 递归处理子目录
       std::string sub_tree_hash = GenerateTreeObjectForDirectory(entry_path);
-      entries.push_back({"40000", entry_name, sub_tree_hash, "tree"});
+      entries.push_back({"40000", entry_name, HexToBin(sub_tree_hash), "tree"});
     } else {
       // 处理文件
       std::string blob_hash = GenerateBlobObjectForFile(entry_path);
       std::string mode = GetFileMode(entry_path); // 100644, 100755 等
-      entries.push_back({mode, entry_name, blob_hash, "blob"});
+      entries.push_back({mode, entry_name, HexToBin(blob_hash), "blob"});
     }
   }
   // 按Git要求的顺序排序条目（树对象在前，按名称排序）
@@ -383,28 +475,40 @@ void SortEntries(std::vector<TreeEntry> &entries) {
             });
 }
 
+/**
+ * @brief 获取文件/目录的Git模式字符串
+ *
+ * 根据文件类型和权限返回对应的Git模式字符串：
+ * - 目录: "040000"
+ * - 符号链接: "120000"
+ * - 可执行文件: "100755"
+ * - 普通文件: "100644"
+ *
+ * @param string_path 文件系统路径（字符串形式）
+ * @return std::string Git模式字符串
+ * @note 使用error_code避免抛出异常，对无效路径返回"100644"作为安全值
+ */
 std::string GetFileMode(const std::string string_path) {
   const fs::path &path = string_path;
   std::error_code ec;
-
+  // 检查目录类型
   if (fs::is_directory(path, ec)) {
     if (!ec)
-      return "040000";
+      return "040000"; // Git目录模式
   }
-
+  // 检查符号链接
   if (fs::is_symlink(path, ec)) {
     if (!ec)
-      return "120000";
+      return "120000"; // Git符号链接模式
   }
-
+  // 获取文件状态
   auto file_status = fs::status(path, ec);
   if (ec)
     return "100644"; // 默认安全值
-
-  // 正确检查执行权限位的方法
+  // 检查可执行权限
   return (file_status.permissions() & fs::perms::owner_exec) != fs::perms::none
-             ? "100755"
-             : "100644";
+             ? "100755"  // 可执行文件模式
+             : "100644"; // 普通文件模式
 }
 /**
  * @brief 检查条目是否应该被忽略
@@ -432,16 +536,31 @@ bool ShouldIgnoreEntry(const std::string &entry_name) {
  */
 std::vector<std::string> GetListOfDirectoryContents(const std::string &path) {
   std::vector<std::string> entries;
-  for (const auto &entry_name : std::filesystem::directory_iterator(path)) {
-    std::cerr << entry_name.path().filename().string() << std::flush;
-    entries.push_back(entry_name.path().filename().string());
+  std::error_code ec;
+
+  // 检查路径是否存在
+  if (!fs::exists(path, ec)) {
+    return entries; // 路径不存在，返回空列表
   }
+
+  // 检查是否为目录
+  if (!fs::is_directory(path, ec)) {
+    return entries; // 不是目录，返回空列表
+  }
+
+  // 遍历目录中的所有条目（非递归）
+  for (const auto &entry : fs::directory_iterator(path, ec)) {
+    if (!ec) {
+      entries.push_back(entry.path().filename().string());
+    }
+  }
+
   return entries;
 }
 /**
  * @brief 创建并写入Git树对象
  * @param entries 待处理的条目列表（需确保hash为20字节二进制）
- * @return std::string 40字符的SHA-1哈希
+ * @return std::string 40字符的十六进制SHA-1哈希字符串
  * @throws std::runtime_error 如果输入无效或文件操作失败
  */
 std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
@@ -450,20 +569,31 @@ std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
   for (const auto &entry : entries) {
     // 每个条目：mode + space + name + null + hash
     if (entry.hash.size() != 20) {
-      throw std::runtime_error(
-          "Invalid hash length for: " + entry.entry_name +
-          "which hash lenth is:" + std::to_string(entry.hash.size()));
+      // 先打印原始数据帮助调试
+      std::cerr << "DEBUG - Raw hash bytes (" << entry.hash.size() << "): ";
+      for (char c : entry.hash) {
+        std::cerr << std::hex << std::setw(2) << std::setfill('0')
+                  << static_cast<int>(static_cast<unsigned char>(c)) << " ";
+      }
+      std::cerr << "\n";
+      THROW_ERROR("Hash must be 20 raw bytes, got " +
+                  std::to_string(entry.hash.size()));
     }
     content += entry.mode + " " + entry.entry_name + '\0';
-    content.append(entry.hash.begin(), entry.hash.end()); // 20字节二进制哈希
+    content.append(entry.hash.begin(),
+                   entry.hash.end()); // 确保追加20字节二进制
   }
   // 2. 构建完整对象
   std::string header = "tree " + std::to_string(content.size()) + '\0';
   std::string tree_obj = header + content;
-  // 3. 计算哈希并存储
+  // 3. 计算哈希
   auto hash = compute_sha1(tree_obj);
+  // 4. 创建对象目录
+  std::string dir_path = ".git/objects/" + hash.substr(0, 2);
+  std::filesystem::create_directories(dir_path);
   std::string obj_path =
       ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
+  // 5.存储
   std::ofstream out(obj_path, std::ios::binary);
   if (!out) {
     throw std::runtime_error("Cannot open: " + obj_path);
@@ -473,4 +603,79 @@ std::string CreateAndWriteTreeObject(std::vector<TreeEntry> entries) {
     throw std::runtime_error("Write failed: " + obj_path);
   }
   return hash;
+}
+
+auto TreeEntry::PrintTreeObjectEntries() const -> void {
+  std::cerr << "--------------------------------------------------\n"
+            << "| Name: " << entry_name << " | Mode: " << mode << "\n"
+            << "| Hash: ";
+  for (char c : hash) {
+    fprintf(stderr, "%02x", static_cast<unsigned char>(c)); // 仅输出到stderr
+  }
+  std::cerr << "\n--------------------------------------------------\n";
+}
+
+/**
+ * @brief 把十六进制字符串转化成二进制字符串
+ * @param hex_str 输入字符串（自动检测十六进制或二进制）
+ * @return std::string 二进制字符串
+ * @throws std::invalid_argument 输入非法时抛出异常
+ *
+ * 智能处理逻辑：
+ * 1. 如果输入长度=20且所有字符<128 → 直接返回（已经是二进制）
+ * 2. 如果输入长度=40且全为十六进制字符 → 转换hex→bin
+ * 3. 其他情况抛出异常
+ */
+std::string HexToBin(const std::string &input) {
+  // 空输入检查
+  if (input.empty()) {
+    throw std::invalid_argument("Input string is empty");
+  }
+
+  // 情况1：可能是20字节二进制数据
+  if (input.size() == 20) {
+    bool is_binary = true;
+    for (char c : input) {
+      if (static_cast<unsigned char>(c) >= 128) {
+        is_binary = false;
+        break;
+      }
+    }
+    if (is_binary)
+      return input; // 直接返回二进制数据
+  }
+
+  // 情况2：40字符十六进制
+  if (input.size() == 40) {
+    auto is_hex = [](char c) {
+      c = tolower(c);
+      return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+    };
+
+    if (std::all_of(input.begin(), input.end(), is_hex)) {
+      std::string binary;
+      binary.reserve(20);
+
+      for (size_t i = 0; i < 40; i += 2) {
+        auto char_to_val = [](char c) -> int {
+          c = tolower(c);
+          return (c >= '0' && c <= '9') ? c - '0' : 10 + c - 'a';
+        };
+
+        unsigned char byte =
+            (char_to_val(input[i]) << 4) | char_to_val(input[i + 1]);
+        binary.push_back(static_cast<char>(byte));
+      }
+      return binary;
+    }
+  }
+
+  // 情况3：无效输入
+  throw std::invalid_argument(
+      "Input must be either:\n"
+      "1. 20-byte binary string (all chars < 128)\n"
+      "2. 40-char hex string\n"
+      "Got: " +
+      std::to_string(input.size()) + " bytes with first byte: 0x" +
+      (input.empty() ? "null" : std::to_string(static_cast<int>(input[0]))));
 }
