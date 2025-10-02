@@ -24,6 +24,9 @@
   throw std::runtime_error(std::string(__FILE__) + ":" +                       \
                            std::to_string(__LINE__) + " in " + __func__ +      \
                            "(): " + msg)
+const char *const AUTHOR = "vivitrx";
+const char *const COMMITTER = "vivitrx";
+const char *const EMAIL = "vivitrx@starshipsyncopation.com";
 //
 std::string decompress_zlib(const std::string &compressed);
 std::string compute_sha1(const std::string &data);
@@ -67,3 +70,12 @@ CreateAndWriteTreeObject(std::vector<TreeEntry> entries); // 返回一个 SHA1 �
 std::vector<std::string> GetListOfDirectoryContents(const std::string &path);
 
 std::string HexToBin(const std::string &hex_str);
+
+std::string WriteTreeWithParentSHA(const std::string &tree_sha,
+                                   const std::string &parent_commit_sha,
+                                   const std::string &commit_message);
+std::string BuildGitCommitContent(const std::string &tree_sha,
+                                  const std::string &parent_sha,
+                                  const std::string &message);
+std::string WriteTreeWithInitialCommit(const std::string &tree_sha,
+                                       const std::string &commit_message);

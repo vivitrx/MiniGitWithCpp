@@ -3,7 +3,8 @@
 #include <filesystem> // 如果使用文件系统操作
 #include <fstream>    // 如果使用文件流
 #include <iostream>   // 用于标准输入输出
-#include <string>     // 用于字符串处理
+#include <ostream>
+#include <string> // 用于字符串处理
 
 int main(int argc, char *argv[]) {
   // Flush after every std::cout / std::cerr
@@ -62,6 +63,35 @@ int main(int argc, char *argv[]) {
     // 递归生成当前目录的树对象
     std::string root_tree_hash = GenerateTreeObjectForDirectory(current_dir);
     std::cout << root_tree_hash << std::endl;
+    return 0;
+  } else if (std::string(argv[1]) == "commit-tree") {
+    std::string tree_sha;
+    std::string parent_commit_sha;
+    std::string commit_message;
+    // 遍历参数进行解析，而不是依赖固定位置
+    for (int i = 2; i < argc; i++) {
+      std::string arg = argv[i];
+
+      if (arg == "-p" && i + 1 < argc) {
+        parent_commit_sha = argv[++i]; // 获取父提交哈希
+      } else if (arg == "-m" && i + 1 < argc) {
+        commit_message = argv[++i]; // 获取提交信息
+      } else {
+        // 假设第一个非选项参数是树对象哈希
+        if (tree_sha.empty()) {
+          tree_sha = arg;
+        }
+      }
+    }
+    std::string sha;
+    if (parent_commit_sha.empty()) {
+      // 初始提交：没有父提交
+      sha = WriteTreeWithInitialCommit(tree_sha, commit_message);
+    } else {
+      // 普通提交：有父提交
+      sha = WriteTreeWithParentSHA(tree_sha, parent_commit_sha, commit_message);
+    }
+    std::cout << sha << std::endl;
     return 0;
   } else {
     std::cerr << "Unknown command " << command << '\n';

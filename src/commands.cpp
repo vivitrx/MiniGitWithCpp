@@ -1,6 +1,8 @@
 #include "commands.h"
 #include <algorithm>
+#include <asm-generic/errno.h>
 #include <iostream>
+#include <openssl/sha.h>
 #include <ostream>
 #include <set>
 #include <string>
@@ -634,4 +636,107 @@ std::string HexToBin(const std::string &hex) {
     bytes.push_back(byte);
   }
   return bytes;
+}
+
+std::string WriteTreeWithParentSHA(const std::string &tree_sha,
+                                   const std::string &parent_commit_sha,
+                                   const std::string &commit_message) {
+  std::string content =
+      BuildGitCommitContent(tree_sha, parent_commit_sha, commit_message);
+
+  auto content_size = content.size();
+
+  auto make_header = [](size_t size) {
+    std::stringstream ss;
+    ss << "commit " << size << '\0';
+    return ss.str();
+  };
+  std::string full_object = make_header(content_size) + content;
+  // 3. 计算原始内容的 SHA-1（压缩前）
+  std::string sha1_hash = compute_sha1(full_object);
+
+  // 4. 创建对象目录
+  std::string dir_path = ".git/objects/" + sha1_hash.substr(0, 2);
+  std::filesystem::create_directories(dir_path);
+
+  // 5. 压缩数据（使用 zlib）
+  std::string compressed_data = compress_zlib(full_object);
+
+  // 6. 写入对象文件（二进制模式）
+  std::string target_file = dir_path + "/" + sha1_hash.substr(2);
+  std::ofstream out_file(target_file, std::ios::binary);
+  if (out_file.is_open()) {
+    out_file.write(compressed_data.data(), compressed_data.size());
+    out_file.close();
+  } else {
+    throw std::runtime_error("Failed to open object file for writing");
+  }
+
+  return sha1_hash;
+}
+std::string BuildGitCommitContent(const std::string &tree_sha,
+                                  const std::string &parent_sha,
+                                  const std::string &message) {
+  std::stringstream content;
+  content << "tree " << tree_sha << "\n"
+          << "parent " << parent_sha << "\n";
+
+  // 使用UTC时区
+  std::time_t now = std::time(nullptr);
+  content << "author " << AUTHOR << " <" << EMAIL << "> " << now << " +0000\n"
+          << "committer " << COMMITTER << " <" << EMAIL << "> " << now
+          << " +0000\n"
+          << "\n"; // 必须的空行
+
+  // 规范化消息体（确保单换行符结尾）
+  std::string msg = message;
+  if (!msg.empty() && msg.back() != '\n') {
+    msg += '\n';
+  }
+  content << msg;
+
+  return content.str();
+}
+std::string WriteTreeWithInitialCommit(const std::string &tree_sha,
+                                       const std::string &commit_message) {
+  // 1. 获取当前 Unix 时间戳
+  std::time_t now = std::time(nullptr);
+  std::stringstream timestamp_ss;
+  timestamp_ss << now << " +0000"; // Git 格式: 时间戳 + 时区
+
+  std::string timestamp = timestamp_ss.str();
+
+  // 2. 构建符合 Git 规范的提交内容
+  std::stringstream commit_content;
+  commit_content << "tree " << tree_sha << "\n"
+                 << "author " << AUTHOR << " <" << EMAIL << "> " << timestamp
+                 << "\n"
+                 << "committer " << COMMITTER << " <" << EMAIL << "> "
+                 << timestamp << "\n"
+                 << "\n" // 空行分隔头部和消息体
+                 << commit_message << "\n";
+
+  std::string content_str = commit_content.str();
+
+  // 3. 计算原始内容的 SHA-1（压缩前）
+  std::string sha1_hash = compute_sha1(content_str);
+
+  // 4. 创建对象目录
+  std::string dir_path = ".git/objects/" + sha1_hash.substr(0, 2);
+  std::filesystem::create_directories(dir_path);
+
+  // 5. 压缩数据（使用 zlib）
+  std::string compressed_data = compress_zlib(content_str);
+
+  // 6. 写入对象文件（二进制模式）
+  std::string target_file = dir_path + "/" + sha1_hash.substr(2);
+  std::ofstream out_file(target_file, std::ios::binary);
+  if (out_file.is_open()) {
+    out_file.write(compressed_data.data(), compressed_data.size());
+    out_file.close();
+  } else {
+    throw std::runtime_error("Failed to open object file for writing");
+  }
+
+  return sha1_hash;
 }
