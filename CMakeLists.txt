@@ -18,15 +18,17 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -fno-inline -fno-omit
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 
-# 手动指定源文件（更清晰明确）
+# 手动指定源文件和头文件（根据图片中的结构）
 set(SOURCE_FILES
-  src/main.cpp
-  src/commands.cpp
+  src/cpp/main.cpp
+  src/cpp/commands.cpp
+  src/cpp/git_clone.cpp
 )
 
 set(HEADER_FILES
-  src/commands.h
-  src/debug.h
+  include/commands.h
+  include/debug.h
+  include/git_clone.h
 )
 
 # 创建可执行文件
@@ -34,7 +36,7 @@ add_executable(git ${SOURCE_FILES} ${HEADER_FILES})
 
 # 设置包含目录
 target_include_directories(git PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 # 设置目标属性
