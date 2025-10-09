@@ -1,0 +1,1 @@
+This is a C++ code example for the [Build your own Git](https://app.codecrafters.io/courses/git/overview) challenge on CodeCrafters.
