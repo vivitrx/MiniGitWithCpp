@@ -797,7 +797,7 @@ int clone(std::string url, std::string dir) {
 
   // 解析pack文件头，提取对象数量（4字节大端序）
   int num_objects = 0;
-  for (int i = 16; i < 20; i++) {
+  for (int i = 8; i < 12; i++) {
     num_objects = num_objects << 8;
     num_objects = num_objects | (unsigned char)pack[i]; // 这也算一种复制操作
   }
@@ -843,7 +843,8 @@ int clone(std::string url, std::string dir) {
       // 应用delta数据到基础对象，重建完整对象
       std::string delta_contents =
           decompress_string(pack.substr(current_position));
-      // 这里最难，前面的逻辑只能算给鱼刮鱼鳞之类的小菜，apply_delta() 这一步才是烹饪硬菜
+      // 这里最难，前面的逻辑只能算给鱼刮鱼鳞之类的小菜，apply_delta()
+      // 这一步才是烹饪硬菜
       std::string reconstructed_contents =
           apply_delta(delta_contents, base_object_contents);
 
