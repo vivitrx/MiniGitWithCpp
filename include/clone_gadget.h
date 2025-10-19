@@ -186,18 +186,37 @@ bool git_init(const std::string &dir) {
   }
 }
 
+/**
+ * @brief 计算字符串的SHA-1哈希值
+ * @param data 待计算哈希的输入字符串
+ * @param print_out 是否将哈希结果输出到控制台（可选参数，默认为false）
+ * @return 返回40个字符的十六进制SHA-1哈希字符串
+ */
 std::string compute_sha1(const std::string &data, bool print_out = false) {
+  // 创建20字节的缓冲区用于存储SHA-1哈希结果
   unsigned char hash[20];
+
+  // 使用OpenSSL的SHA1函数计算输入数据的哈希值
   SHA1(reinterpret_cast<const unsigned char *>(data.c_str()), data.size(),
        hash);
+
+  // 创建字符串流用于构建十六进制哈希字符串
   std::stringstream ss;
+
+  // 设置字符串流格式：十六进制、用0填充
   ss << std::hex << std::setfill('0');
+
+  // 遍历哈希结果的每个字节，转换为十六进制格式
   for (const auto &byte : hash) {
     ss << std::setw(2) << static_cast<int>(byte);
   }
+
+  // 如果设置了print_out参数，将哈希结果输出到控制台
   if (print_out) {
     std::cout << ss.str() << std::endl;
   }
+
+  // 返回构建好的十六进制哈希字符串
   return ss.str();
 }
 
@@ -243,90 +262,161 @@ int compress(FILE *input, FILE *output) {
   return EXIT_SUCCESS;
 }
 
+/**
+ * @brief 压缩并存储Git对象到本地仓库
+ * @param hash Git对象的SHA-1哈希值（40字符十六进制字符串）
+ * @param content 待压缩和存储的对象内容
+ * @param dir 目标目录路径（可选参数，默认为当前目录）
+ */
 void compress_and_store(const std::string &hash, const std::string &content,
                         std::string dir = ".") {
+  // 将内容字符串转换为内存文件流，用于压缩处理
   FILE *input = fmemopen((void *)content.c_str(), content.length(), "rb");
+
+  // 从哈希值中提取前2个字符作为文件夹名（Git对象存储的目录结构）
   std::string hash_folder = hash.substr(0, 2);
+
+  // 构建完整的对象存储路径：dir/.git/objects/hash_folder/
   std::string object_path = dir + "/.git/objects/" + hash_folder + '/';
+
+  // 检查对象目录是否存在，如果不存在则创建
   if (!std::filesystem::exists(object_path)) {
     std::filesystem::create_directories(object_path);
   }
+
+  // 构建完整的对象文件路径：dir/.git/objects/hash_folder/hash_remaining
   std::string object_file_path = object_path + hash.substr(2);
+
+  // 检查对象文件是否已存在，避免重复存储
   if (!std::filesystem::exists(object_file_path)) {
+    // 以二进制写入模式打开对象文件
     FILE *output = fopen(object_file_path.c_str(), "wb");
+
+    // 调用压缩函数将输入内容压缩到输出文件
     if (compress(input, output) != EXIT_SUCCESS) {
       std::cerr << "Failed to compress data.\n";
       return;
     }
+
+    // 关闭输出文件流
     fclose(output);
   }
+
+  // 关闭输入文件流
   fclose(input);
 }
 
+/**
+ * @brief 解析Git pack文件中的变长编码长度字段
+ * @param pack 包含pack文件数据的字符串
+ * @param pos 当前解析位置的指针，函数会更新此位置
+ * @return 解析得到的长度值
+ * @note 实现Git pack协议的变长编码解析，最高位为1表示继续读取下个字节
+ */
 int read_length(const std::string &pack, int *pos) {
   int length = 0;
+  // 提取当前字节的低4位作为长度的初始值
   length |= pack[*pos] & 0x0F;
+
+  // 检查最高位是否为1，如果是则需要继续读取后续字节
   if (pack[*pos] & 0x80) {
-    (*pos)++;
+    (*pos)++; // 移动到下一个字节
+
+    // 循环读取直到遇到最高位为0的字节
     while (pack[*pos] & 0x80) {
-      length <<= 7;
-      length |= pack[*pos] & 0x7F;
-      (*pos)++;
+      length <<= 7;                // 左移7位为新的数据腾出空间
+      length |= pack[*pos] & 0x7F; // 提取7位有效数据并合并
+      (*pos)++;                    // 继续移动到下一个字节
     }
-    length <<= 7;
-    length |= pack[*pos];
+
+    // 处理最后一个字节（最高位为0）
+    length <<= 7;         // 最后一次左移
+    length |= pack[*pos]; // 提取完整的8位数据
   }
-  (*pos)++;
+
+  (*pos)++; // 移动到下一个要解析的位置
   return length;
 }
 
+/**
+ * @brief 应用Git delta压缩数据到基础对象，重建完整对象内容
+ * @param delta_contents delta压缩指令数据
+ * @param base_contents 基础对象的完整内容
+ * @return 重建后的完整对象内容字符串
+ * @note 实现Git pack协议中的delta解压缩算法，支持复制和添加两种指令
+ */
 std::string apply_delta(const std::string &delta_contents,
                         const std::string &base_contents) {
   std::string reconstructed_object;
   int current_position_in_delta = 0;
+
+  // 跳过delta头部两个长度字段（基础对象长度和目标对象长度）
   read_length(delta_contents, &current_position_in_delta);
   read_length(delta_contents, &current_position_in_delta);
+
+  // 逐指令处理delta数据
   while (current_position_in_delta < delta_contents.length()) {
+    // 读取指令字节并后移位置
     unsigned char current_instruction =
         delta_contents[current_position_in_delta++];
-    if (current_instruction & 0x80) {
-      int copy_offset = 0;
-      int copy_size = 0;
-      int bytes_processed_for_offset = 0;
+
+    if (current_instruction & 0x80) {     // 最高位为1：复制指令
+      int copy_offset = 0;                // 从基础对象的复制起始位置
+      int copy_size = 0;                  // 复制的数据长度
+      int bytes_processed_for_offset = 0; // 已处理的偏移量字节数
+
+      // 解析4个字节的复制偏移量（可选，由指令字节的位3-0控制）
       for (int i = 3; i >= 0; i--) {
-        copy_offset <<= 8;
-        if (current_instruction & (1 << i)) {
+        copy_offset <<= 8;                    // 左移为新的字节腾出空间
+        if (current_instruction & (1 << i)) { // 检查对应位是否设置
           copy_offset += static_cast<unsigned char>(
               delta_contents[current_position_in_delta + i]);
           bytes_processed_for_offset++;
         }
       }
+
+      // 解析3个字节的复制长度（可选，由指令字节的位6-4控制）
       int bytes_processed_for_size = 0;
       for (int i = 6; i >= 4; i--) {
-        copy_size <<= 8;
-        if (current_instruction & (1 << i)) {
+        copy_size <<= 8;                      // 左移为新的字节腾出空间
+        if (current_instruction & (1 << i)) { // 检查对应位是否设置
+          // 注意：长度参数紧跟在偏移量参数之后
           copy_size += static_cast<unsigned char>(
               delta_contents[current_position_in_delta + i -
                              (4 - bytes_processed_for_offset)]);
           bytes_processed_for_size++;
         }
       }
+
+      // 特殊处理：如果复制长度为0，则默认为1MB
       if (copy_size == 0) {
         copy_size = 0x100000;
       }
+
+      // 从基础对象复制指定范围的数据到重建对象
       reconstructed_object += base_contents.substr(copy_offset, copy_size);
+
+      // 前移位置跳过已处理的参数数据
       current_position_in_delta +=
           bytes_processed_for_size + bytes_processed_for_offset;
-    } else {
-      int add_size = current_instruction & 0x7F;
+
+    } else { // 最高位为0：添加指令
+      // 直接从delta数据中添加新内容
+      int add_size = current_instruction & 0x7F; // 提取低7位作为添加长度
       reconstructed_object +=
           delta_contents.substr(current_position_in_delta, add_size);
-      current_position_in_delta += add_size;
+      current_position_in_delta += add_size; // 前移位置
     }
   }
   return reconstructed_object;
 }
 
+/**
+ * @brief 将二进制SHA-1摘要转换为40字符的十六进制哈希字符串
+ * @param digest 20字节的二进制SHA-1摘要数据
+ * @return 返回40个字符的十六进制SHA-1哈希字符串，格式化为小写
+ * @note 这是Git对象存储中的标准哈希格式，用于对象标识和文件路径构建
+ */
 std::string digest_to_hash(const std::string &digest) {
   std::stringstream ss;
   for (unsigned char c : digest) {
@@ -344,57 +434,57 @@ std::string digest_to_hash(const std::string &digest) {
 std::string decompress_string(const std::string &compressed_str) {
   // 初始化zlib解压缩流结构体
   z_stream d_stream;
-  
+
   // 将解压缩流结构体清零，确保所有字段初始化为0
   memset(&d_stream, 0, sizeof(d_stream));
-  
+
   // 初始化解压缩流，如果失败则抛出异常
   if (inflateInit(&d_stream) != Z_OK) {
     throw(std::runtime_error("inflateInit failed while decompressing."));
   }
-  
+
   // 设置输入缓冲区指向压缩字符串的数据
   d_stream.next_in =
       reinterpret_cast<Bytef *>(const_cast<char *>(compressed_str.data()));
-  
+
   // 设置输入数据的可用大小
   d_stream.avail_in = compressed_str.size();
-  
+
   // 存储解压缩操作的状态码
   int status;
-  
+
   // 定义解压缩缓冲区大小（32KB）
   const size_t buffer_size = 32768;
-  
+
   // 创建解压缩缓冲区
   char buffer[buffer_size];
-  
+
   // 存储最终解压缩结果的字符串
   std::string decompressed_str;
-  
+
   // 循环执行解压缩操作，直到所有数据被处理完毕
   do {
     // 设置输出缓冲区指向临时缓冲区
     d_stream.next_out = reinterpret_cast<Bytef *>(buffer);
-    
+
     // 设置输出缓冲区的可用大小
     d_stream.avail_out = buffer_size;
-    
+
     // 执行解压缩操作，0表示无特殊标志
     status = inflate(&d_stream, 0);
-    
+
     // 如果解压缩数据量增加，将新数据追加到结果字符串
     if (decompressed_str.size() < d_stream.total_out) {
       decompressed_str.append(buffer,
                               d_stream.total_out - decompressed_str.size());
     }
-  } while (status == Z_OK);  // 继续循环直到解压缩完成或出错
-  
+  } while (status == Z_OK); // 继续循环直到解压缩完成或出错
+
   // 结束解压缩流，如果失败则抛出异常
   if (inflateEnd(&d_stream) != Z_OK) {
     throw(std::runtime_error("inflateEnd failed while decompressing."));
   }
-  
+
   // 检查解压缩是否正常结束，如果不是则抛出详细错误信息
   if (status != Z_STREAM_END) {
     std::ostringstream oss;
@@ -402,42 +492,67 @@ std::string decompress_string(const std::string &compressed_str) {
         << d_stream.msg;
     throw(std::runtime_error(oss.str()));
   }
-  
+
   // 返回解压缩后的字符串
   return decompressed_str;
 }
 
+/**
+ * @brief 使用zlib库压缩字符串数据
+ * @param input_str 待压缩的输入字符串
+ * @return 压缩后的字符串数据
+ * @throws std::runtime_error 如果压缩过程中发生错误
+ * @note 使用DEFLATE算法进行压缩，压缩级别为Z_DEFAULT_COMPRESSION
+ */
 std::string compress_string(const std::string &input_str) {
+  // 初始化zlib压缩流结构体
   z_stream c_stream;
   memset(&c_stream, 0, sizeof(c_stream));
+
+  // 初始化压缩流，使用默认压缩级别，如果失败则抛出异常
   if (deflateInit(&c_stream, Z_DEFAULT_COMPRESSION) != Z_OK) {
     throw(std::runtime_error("deflateInit failed while compressing."));
   }
+
+  // 设置输入缓冲区指向输入字符串数据
   c_stream.next_in =
       reinterpret_cast<Bytef *>(const_cast<char *>(input_str.data()));
   c_stream.avail_in = input_str.size();
-  int status;
-  const size_t buffer_size = 32768;
-  char buffer[buffer_size];
-  std::string compressed_str;
+
+  int status;                       // 存储压缩操作的状态码
+  const size_t buffer_size = 32768; // 定义输出缓冲区大小（32KB）
+  char buffer[buffer_size];         // 创建输出缓冲区
+  std::string compressed_str;       // 存储压缩结果的字符串
+
+  // 循环执行压缩操作，直到所有数据被处理完毕
   do {
+    // 设置输出缓冲区指针和可用大小
     c_stream.next_out = reinterpret_cast<Bytef *>(buffer);
     c_stream.avail_out = sizeof(buffer);
+
+    // 执行压缩操作，Z_FINISH表示这是最后一块数据
     status = deflate(&c_stream, Z_FINISH);
+
+    // 如果压缩数据量增加，将新数据追加到结果字符串
     if (compressed_str.size() < c_stream.total_out) {
       compressed_str.append(buffer, c_stream.total_out - compressed_str.size());
     }
-  } while (status == Z_OK);
+  } while (status == Z_OK); // 继续循环直到压缩完成
+
+  // 结束压缩流，如果失败则抛出异常
   if (deflateEnd(&c_stream) != Z_OK) {
     throw(std::runtime_error("deflateEnd failed while compressing."));
   }
+
+  // 检查压缩是否正常结束，如果不是则抛出详细错误信息
   if (status != Z_STREAM_END) {
     std::ostringstream oss;
     oss << "Exception during zlib compression: (" << status << ") "
         << c_stream.msg;
     throw(std::runtime_error(oss.str()));
   }
-  return compressed_str;
+
+  return compressed_str; // 返回压缩后的字符串
 }
 
 size_t write_callback(void *received_data, size_t element_size,
@@ -461,33 +576,55 @@ size_t pack_data_callback(void *received_data, size_t element_size,
   return element_size * num_element;
 }
 
+/**
+ * @brief 通过HTTP协议与Git远程仓库通信，获取pack文件和分支信息
+ * @param url 远程Git仓库的URL地址
+ * @return 返回包含pack文件数据和master分支哈希的pair对
+ * @note 实现Git智能HTTP协议，先获取info/refs再下载pack文件
+ */
 std::pair<std::string, std::string> curl_request(const std::string &url) {
+  // 初始化libcurl句柄
   CURL *handle = curl_easy_init();
   if (handle) {
-    // fetch info/refs
+    // 第一步：获取远程仓库的info/refs信息，包含分支和对象引用
     curl_easy_setopt(handle, CURLOPT_URL,
                      (url + "/info/refs?service=git-upload-pack").c_str());
 
+    // 设置回调函数处理响应数据，提取master分支的哈希值
     std::string packhash;
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, write_callback);
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void *)&packhash);
-    curl_easy_perform(handle);
+    curl_easy_perform(handle); // 执行HTTP请求
+
+    // 重置curl句柄，准备下一个请求
     curl_easy_reset(handle);
-    // fetch git-upload-pack
+
+    // 第二步：通过git-upload-pack服务下载pack文件数据
     curl_easy_setopt(handle, CURLOPT_URL, (url + "/git-upload-pack").c_str());
+
+    // 构建Git协议请求数据：want指定需要的对象，done表示请求结束
     std::string postdata = "0032want " + packhash + "\n" + "00000009done\n";
     curl_easy_setopt(handle, CURLOPT_POSTFIELDS, postdata.c_str());
+
+    // 设置pack文件数据的接收回调
     std::string pack;
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void *)&pack);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, pack_data_callback);
+
+    // 设置HTTP请求头，指定Git上传包请求的内容类型
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(
         headers, "Content-Type: application/x-git-upload-pack-request");
     curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
+
+    // 执行pack文件下载请求
     curl_easy_perform(handle);
-    // clean up
+
+    // 清理资源：释放curl句柄和HTTP头链表
     curl_easy_cleanup(handle);
     curl_slist_free_all(headers);
+
+    // 返回pack文件数据和master分支哈希
     return {pack, packhash};
   } else {
     std::cerr << "Failed to initialize curl.\n";
@@ -567,39 +704,76 @@ int cat_file_for_clone(const char *file_path, const std::string &dir,
   return EXIT_SUCCESS;
 }
 
+/**
+ * @brief 从Git tree对象中递归恢复文件和目录结构
+ * @param tree_hash tree对象的SHA-1哈希值（40字符十六进制字符串）
+ * @param dir 目标恢复目录路径
+ * @param proj_dir Git项目根目录路径（包含.git目录）
+ * @note 该函数递归处理tree对象，创建对应的目录结构并恢复文件内容
+ */
 void restore_tree(const std::string &tree_hash, const std::string &dir,
                   const std::string &proj_dir) {
+  // 构建Git对象文件路径：proj_dir/.git/objects/xx/xxxxxx...（前2字符作为目录，剩余38字符作为文件名）
   std::string object_path = proj_dir + "/.git/objects/" +
                             tree_hash.substr(0, 2) + '/' + tree_hash.substr(2);
+
+  // 以二进制模式打开tree对象文件
   std::ifstream master_tree(object_path);
+
+  // 创建字符串流用于读取文件全部内容
   std::ostringstream buffer;
   buffer << master_tree.rdbuf();
+
+  // 使用zlib解压缩tree对象内容（Git对象都是压缩存储的）
   std::string tree_contents = decompress_string(buffer.str());
+
+  // 跳过tree对象头信息（格式为"tree <size>\0"），只保留实际的条目数据
   tree_contents = tree_contents.substr(tree_contents.find('\0') + 1);
-  // iterate over each entry in the tree object
+
+  // 遍历tree对象中的每个条目（文件或子目录）
   int pos = 0;
   while (pos < tree_contents.length()) {
+    // 检查当前条目是否为目录（模式为"40000"表示目录）
     if (tree_contents.find("40000", pos) == pos) {
-      pos += 6; // skip the mode 40000
-      // extract the directory path
+      pos += 6; // 跳过模式字符串"40000"和后面的空格（共6个字符）
+
+      // 提取目录路径名（从当前位置到下一个空字符之间的内容）
       std::string path =
           tree_contents.substr(pos, tree_contents.find('\0', pos) - pos);
-      pos += path.length() + 1; // skip the path and the null byte
+      pos += path.length() + 1; // 跳过路径字符串和结束空字符
+
+      // 提取子tree对象的20字节二进制SHA-1哈希值，并转换为40字符十六进制字符串
       std::string next_hash = digest_to_hash(tree_contents.substr(pos, 20));
-      // create directories and recursively restore the nested tree
+
+      // 在目标目录中创建子目录
       std::filesystem::create_directory(dir + '/' + path);
+
+      // 递归调用restore_tree处理子目录，恢复其中的文件和子目录
       restore_tree(next_hash, dir + '/' + path, proj_dir);
-      pos += 20; // skip the hash
+
+      pos += 20; // 跳过20字节的哈希值，继续处理下一个条目
     } else {
-      pos += 7; // skip the mode 100644
+      // 处理文件条目（模式为"100644"表示普通文件）
+      pos += 7; // 跳过模式字符串"100644"和后面的空格（共7个字符）
+
+      // 提取文件名（从当前位置到下一个空字符之间的内容）
       std::string path =
           tree_contents.substr(pos, tree_contents.find('\0', pos) - pos);
-      pos += path.length() + 1; // skip the path and the null byte
+      pos += path.length() + 1; // 跳过文件名和结束空字符
+
+      // 提取blob对象的20字节二进制SHA-1哈希值，并转换为40字符十六进制字符串
       std::string blob_hash = digest_to_hash(tree_contents.substr(pos, 20));
+
+      // 以二进制写入模式创建新文件
       FILE *new_file = fopen((dir + '/' + path).c_str(), "wb");
+
+      // 调用cat_file_for_clone函数从Git对象库中读取blob内容并写入文件
       cat_file_for_clone(blob_hash.c_str(), proj_dir, new_file);
+
+      // 关闭文件句柄
       fclose(new_file);
-      pos += 20; // skip the hash
+
+      pos += 20; // 跳过20字节的哈希值，继续处理下一个条目
     }
   }
 }
@@ -648,7 +822,7 @@ int clone(std::string url, std::string dir) {
     if (object_type == 6) { // 偏移量delta对象（暂不支持）
       throw std::invalid_argument("Offset deltas not implemented.\n");
     } else if (object_type == 7) { // 引用delta对象处理
-      // 提取基础对象的20字节SHA-1摘要
+      // 提取基础对象的20字节SHA-1引用(也可以被称为摘要)
       std::string digest = pack.substr(current_position, 20);
       std::string hash = digest_to_hash(digest);
       current_position += 20;
@@ -669,6 +843,7 @@ int clone(std::string url, std::string dir) {
       // 应用delta数据到基础对象，重建完整对象
       std::string delta_contents =
           decompress_string(pack.substr(current_position));
+      // 这里最难，前面的逻辑只能算给鱼刮鱼鳞之类的小菜，apply_delta() 这一步才是烹饪硬菜
       std::string reconstructed_contents =
           apply_delta(delta_contents, base_object_contents);
 
