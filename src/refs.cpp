@@ -17,10 +17,10 @@ void MiniGitRef::Init() {
 }
 /**
  * @brief 获取当前HEAD指向的提交哈希
- * 
+ *
  * 解析HEAD文件，返回当前工作分支或分离HEAD状态下指向的提交哈希。
  * 支持符号引用解析：HEAD → "ref: refs/heads/main" → 读取分支文件 → 提交哈希
- * 
+ *
  * @return std::string 当前HEAD指向的40字符SHA-1提交哈希
  * @note 如果HEAD文件损坏或指向不存在的引用，行为未定义
  */
@@ -81,7 +81,7 @@ std::vector<std::string> MiniGitRef::ListAllBranches() const {
 }
 /**
  * @brief 更新分支引用的提交哈希
- * 
+ *
  * 将指定分支的引用指向新的提交对象，实现分支"指针"的移动。
  * 对应Git命令：git update-ref refs/heads/<branch> <new-hash>
  *
@@ -109,12 +109,12 @@ bool MiniGitRef::UpdateBranch(const std::string &branch_name,
 }
 /**
  * @brief 读取Git引用文件内容
- * 
+ *
  * 解析Git引用文件，返回其中存储的对象哈希值。
  * 支持直接哈希和符号引用(仅支持HEAD)两种格式：
  * - 直接哈希：直接返回文件中的哈希值
  * - 符号引用：解析引用链，返回最终指向的哈希值
- * 
+ *
  * @param path 引用文件路径（如".git/refs/heads/main"）
  * @return std::string 引用的对象哈希值，失败时返回空字符串
  * @example 输入: ".git/refs/heads/main" 输出: "a1b2c3d4e5f6..."
@@ -144,18 +144,40 @@ auto MiniGitRef::ReadRefFile(const std::string &path) const -> std::string {
 /**
  * @brief 获取当前分支名称
  * 
- * @return std::string 当前分支名称，如果HEAD指向直接哈希则返回空字符串
+ * 解析HEAD文件，提取当前工作分支的名称。
+ * 仅支持 符号引用 解析，从"ref: refs/heads/main"中提取"main"。
+ * 
+ * @return 分支名（如"main"），分离HEAD或文件错误返回空字符串
+ * @example "ref: refs/heads/main" → "main"
+ * @example "a1b2c3d4e5f6..." → ""（分离HEAD）
+ * @throw std::runtime_error HEAD文件打开失败
  */
 std::string MiniGitRef::GetCurrentBranchName() const {
-  // TODO: 实现获取当前分支名称功能
-  throw std::runtime_error("GetCurrentBranchName() not implemented yet");
+  std::ifstream head_file(HEAD_path_);
+  if (!head_file) {
+    throw std::runtime_error("文件打开失败!");
+  }
+  std::string head_content;
+  std::getline(head_file, head_content);
+  if (!head_content.starts_with("ref: ")) {
+    return {}; // 不是符号引用，可能是分离HEAD状态, 直接返回空字符串
+  }
+  // 提取分支路径并解析分支名称
+  std::string branch_path = head_content.substr(5); // 去掉 "ref: " 前缀
+  // 去除可能的换行符
+  branch_path.erase(branch_path.find_last_not_of("\n\r") + 1);
+  // 提取分支名称（去掉 "refs/heads/" 前缀）
+  if (branch_path.starts_with("refs/heads/")) {
+    return branch_path.substr(11); // 11 = strlen("refs/heads/")
+  }
+  return {}; // 如果HEAD指向直接哈希则返回空字符串
 }
 
 /**
  * @brief 创建新分支
- * 
+ *
  * 创建一个新的分支引用，指向当前HEAD所指向的提交
- * 
+ *
  * @param name 新分支的名称
  * @return std::string 新分支指向的提交哈希
  * @throw std::runtime_error 分支已存在或创建失败
