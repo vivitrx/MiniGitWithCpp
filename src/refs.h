@@ -47,13 +47,14 @@ public:
   std::vector<std::string> ListAllBranches() const;
 
   // 引用更新
-  bool UpdateBranch(const std::string &name, const std::string &new_hash);
   bool UpdateCurrentBranch(const std::string &new_hash) {
     return UpdateBranch(GetCurrentBranchName(), new_hash);
   }
 
 private:
   // 辅助函数
+  bool UpdateBranch(const std::string &branch_name,
+                    const std::string &new_hash);
   void WriteRefFile(const std::string &path, const std::string &content);
   auto ReadRefFile(const std::string &path) const -> std::string;
   std::filesystem::path HEAD_path_ = ".git/HEAD";

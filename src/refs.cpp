@@ -71,11 +71,32 @@ std::vector<std::string> MiniGitRef::ListAllBranches() const {
   }
   return branches;
 }
-
-bool MiniGitRef::UpdateBranch(const std::string &name,
+/**
+ * @brief 更改一个分支指向的commit
+ *
+ * @param branch_name
+ * @param new_hash
+ * @return true
+ * @return false
+ */
+bool MiniGitRef::UpdateBranch(const std::string &branch_name,
                               const std::string &new_hash) {
-  // TODO: 更新分支指向新的提交哈希
-  throw std::runtime_error("UpdateBranch() not implemented yet");
+  if (!BranchExists(branch_name)) {
+    throw std::runtime_error("Branch '" + branch_name + "' does not exist!");
+  }
+
+  // 基本哈希格式验证（可选）
+  if (new_hash.empty() || new_hash.length() != 40) {
+    throw std::runtime_error("Invalid commit hash format");
+  }
+
+  std::ofstream branch_file(".git/refs/heads/" + branch_name);
+  if (!branch_file) {
+    return false; // 文件打开失败
+  }
+
+  branch_file << new_hash << "\n";
+  return branch_file.good(); // 检查写入是否成功
 }
 
 void MiniGitRef::WriteRefFile(const std::string &path,
