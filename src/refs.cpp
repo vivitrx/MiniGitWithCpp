@@ -109,10 +109,17 @@ void MiniGitRef::WriteRefFile(const std::string &path,
   throw std::runtime_error("WriteRefFile() not implemented yet");
 }
 /**
- * @brief 给定一个 git reference 的 path, 返回该ref存储的对象hash
- * @example 输入: ".git/refs/heads/main" 输出: "a1b2c3"
- * @param path
- * @return std::string
+ * @brief 读取Git引用文件内容
+ * 
+ * 解析Git引用文件，返回其中存储的对象哈希值。
+ * 支持直接哈希和符号引用(仅支持HEAD)两种格式：
+ * - 直接哈希：直接返回文件中的哈希值
+ * - 符号引用：解析引用链，返回最终指向的哈希值
+ * 
+ * @param path 引用文件路径（如".git/refs/heads/main"）
+ * @return std::string 引用的对象哈希值，失败时返回空字符串
+ * @example 输入: ".git/refs/heads/main" 输出: "a1b2c3d4e5f6..."
+ * @note 支持HEAD文件的特殊处理，能正确解析"ref: refs/heads/branch"格式
  */
 auto MiniGitRef::ReadRefFile(const std::string &path) const -> std::string {
   if (path == HEAD_path_) {
