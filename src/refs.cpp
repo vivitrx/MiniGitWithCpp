@@ -88,25 +88,16 @@ bool MiniGitRef::UpdateBranch(const std::string &branch_name,
   if (!BranchExists(branch_name)) {
     throw std::runtime_error("Branch '" + branch_name + "' does not exist!");
   }
-
   // 基本哈希格式验证（可选）
   if (new_hash.empty() || new_hash.length() != 40) {
     throw std::runtime_error("Invalid commit hash format");
   }
-
   std::ofstream branch_file(".git/refs/heads/" + branch_name);
   if (!branch_file) {
     return false; // 文件打开失败
   }
-
   branch_file << new_hash << "\n";
   return branch_file.good(); // 检查写入是否成功
-}
-
-void MiniGitRef::WriteRefFile(const std::string &path,
-                              const std::string &content) {
-  // TODO: 写入引用文件
-  throw std::runtime_error("WriteRefFile() not implemented yet");
 }
 /**
  * @brief 读取Git引用文件内容
