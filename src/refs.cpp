@@ -111,7 +111,7 @@ bool MiniGitRef::UpdateBranch(const std::string &branch_name,
  * @brief 读取Git引用文件内容
  *
  * 解析Git引用文件，返回其中存储的对象哈希值。
- * 支持直接哈希和符号引用(仅支持HEAD)两种格式：
+ * 支持直接哈希和符号引用(对于符号引用，仅支持HEAD)两种格式：
  * - 直接哈希：直接返回文件中的哈希值
  * - 符号引用：解析引用链，返回最终指向的哈希值
  *
@@ -143,10 +143,10 @@ auto MiniGitRef::ReadRefFile(const std::string &path) const -> std::string {
 
 /**
  * @brief 获取当前分支名称
- * 
+ *
  * 解析HEAD文件，提取当前工作分支的名称。
  * 仅支持 符号引用 解析，从"ref: refs/heads/main"中提取"main"。
- * 
+ *
  * @return 分支名（如"main"），分离HEAD或文件错误返回空字符串
  * @example "ref: refs/heads/main" → "main"
  * @example "a1b2c3d4e5f6..." → ""（分离HEAD）
@@ -174,15 +174,33 @@ std::string MiniGitRef::GetCurrentBranchName() const {
 }
 
 /**
- * @brief 创建新分支
+ * @brief 基于当前HEAD创建新分支
  *
- * 创建一个新的分支引用，指向当前HEAD所指向的提交
- *
+ * 创建新分支引用文件，指向当前HEAD所指向的提交。
+ * 对应Git命令：git branch <name>（基于当前HEAD创建分支）
+ * 
  * @param name 新分支的名称
- * @return std::string 新分支指向的提交哈希
- * @throw std::runtime_error 分支已存在或创建失败
+ * @return std::string 新分支指向的提交哈希（40字符SHA-1）
+ * @throw std::runtime_error 分支已存在、HEAD无效或文件操作失败
+ * @note 新分支文件内容为当前HEAD指向的提交哈希
  */
 std::string MiniGitRef::CreateBranch(const std::string &name) {
-  // TODO: 实现创建分支功能
-  throw std::runtime_error("CreateBranch() not implemented yet");
+  if (BranchExists(name)) {
+    throw std::runtime_error("Branch '" + name + "' already exists!");
+  }
+  std::string current_commit = GetCurrentCommit();
+  if (current_commit.empty()) {
+    throw std::runtime_error(
+        "Cannot create branch: HEAD does not point to a valid commit");
+  }
+  std::ofstream new_branch_file(".git/refs/heads/" + name);
+  if (!new_branch_file) {
+    throw std::runtime_error("Failed to create branch file for '" + name + "'");
+  }
+  new_branch_file << current_commit << "\n";
+  if (!new_branch_file.good()) {
+    throw std::runtime_error("Failed to write commit hash to branch '" + name +
+                             "'");
+  }
+  return current_commit;
 }

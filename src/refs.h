@@ -41,7 +41,7 @@ public:
   std::string GetCurrentBranchName() const;
 
   // 分支管理
-  std::string CreateBranch(const std::string &name); // 返回初始提交哈希
+  std::string CreateBranch(const std::string &name);
   void SwitchToBranch(const std::string &name);      // 明确动词前缀
   bool BranchExists(const std::string &name) const;
   std::vector<std::string> ListAllBranches() const;
