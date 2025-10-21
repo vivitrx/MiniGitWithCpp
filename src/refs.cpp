@@ -72,12 +72,16 @@ std::vector<std::string> MiniGitRef::ListAllBranches() const {
   return branches;
 }
 /**
- * @brief 更改一个分支指向的commit
+ * @brief 更新分支引用的提交哈希
+ * 
+ * 将指定分支的引用指向新的提交对象，实现分支"指针"的移动。
+ * 对应Git命令：git update-ref refs/heads/<branch> <new-hash>
  *
- * @param branch_name
- * @param new_hash
- * @return true
- * @return false
+ * @param branch_name 要更新的分支名称
+ * @param new_hash 新的提交哈希值（40字符SHA-1）
+ * @return true 更新成功
+ * @return false 更新失败
+ * @throw std::runtime_error 分支不存在或哈希格式无效
  */
 bool MiniGitRef::UpdateBranch(const std::string &branch_name,
                               const std::string &new_hash) {
