@@ -1,6 +1,7 @@
 #include "refs.h"
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <stdexcept>
 #include <string>
@@ -27,10 +28,19 @@ std::string MiniGitRef::GetCurrentCommit() const {
   // 如果HEAD直接是提交哈希, 一般而言不会是直接提交哈希
   return head_content;
 }
-
+/**
+ * @brief 切换到指定分支
+ * 
+ * @param name 分支名称
+ */
 void MiniGitRef::SwitchToBranch(const std::string &name) {
-  // TODO: 切换到指定分支
-  throw std::runtime_error("SwitchToBranch() not implemented yet");
+  if (!BranchExists(name)) {
+    throw std::runtime_error("Branch '" + name + "' does not exist!");
+  }
+  std::string branch_ref = "ref: refs/heads/" + name;
+  std::ofstream head_file(HEAD_path_);
+  head_file << branch_ref << "\n";
+  std::cout << "Now working on branch: " << name << std::endl;
 }
 
 bool MiniGitRef::BranchExists(const std::string &name) const {
