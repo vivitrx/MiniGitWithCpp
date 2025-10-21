@@ -53,10 +53,23 @@ bool MiniGitRef::BranchExists(const std::string &name) const {
   fs::path branch_path = ".git/refs/heads/" + name;
   return fs::exists(branch_path);
 }
-
+/**
+ * @brief 列出所有分支
+ *
+ * @return std::vector<std::string>
+ */
 std::vector<std::string> MiniGitRef::ListAllBranches() const {
-  // TODO: 列出所有分支
-  throw std::runtime_error("ListAllBranches() not implemented yet");
+  std::vector<std::string> branches;
+  fs::path refs_heads_path = ".git/refs/heads";
+  if (!fs::exists(refs_heads_path)) {
+    return branches; // 目录不存在，返回空列表
+  }
+  for (const auto &entry : fs::directory_iterator(refs_heads_path)) {
+    if (entry.is_regular_file()) { // 只处理文件，跳过子目录
+      branches.push_back(entry.path().filename().string());
+    }
+  }
+  return branches;
 }
 
 bool MiniGitRef::UpdateBranch(const std::string &name,
