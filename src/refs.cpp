@@ -132,3 +132,27 @@ auto MiniGitRef::ReadRefFile(const std::string &path) const -> std::string {
   std::getline(ref_file, content);
   return content;
 }
+
+/**
+ * @brief 获取当前分支名称
+ * 
+ * @return std::string 当前分支名称，如果HEAD指向直接哈希则返回空字符串
+ */
+std::string MiniGitRef::GetCurrentBranchName() const {
+  // TODO: 实现获取当前分支名称功能
+  throw std::runtime_error("GetCurrentBranchName() not implemented yet");
+}
+
+/**
+ * @brief 创建新分支
+ * 
+ * 创建一个新的分支引用，指向当前HEAD所指向的提交
+ * 
+ * @param name 新分支的名称
+ * @return std::string 新分支指向的提交哈希
+ * @throw std::runtime_error 分支已存在或创建失败
+ */
+std::string MiniGitRef::CreateBranch(const std::string &name) {
+  // TODO: 实现创建分支功能
+  throw std::runtime_error("CreateBranch() not implemented yet");
+}
