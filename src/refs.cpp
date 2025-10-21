@@ -30,7 +30,7 @@ std::string MiniGitRef::GetCurrentCommit() const {
 }
 /**
  * @brief 切换到指定分支
- * 
+ *
  * @param name 分支名称
  */
 void MiniGitRef::SwitchToBranch(const std::string &name) {
@@ -42,10 +42,16 @@ void MiniGitRef::SwitchToBranch(const std::string &name) {
   head_file << branch_ref << "\n";
   std::cout << "Now working on branch: " << name << std::endl;
 }
-
+/**
+ * @brief 检查分支是否存在
+ *
+ * @param name
+ * @return true
+ * @return false
+ */
 bool MiniGitRef::BranchExists(const std::string &name) const {
-  // TODO: 检查分支是否存在
-  throw std::runtime_error("BranchExists() not implemented yet");
+  fs::path branch_path = ".git/refs/heads/" + name;
+  return fs::exists(branch_path);
 }
 
 std::vector<std::string> MiniGitRef::ListAllBranches() const {
