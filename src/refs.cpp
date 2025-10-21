@@ -15,7 +15,15 @@ void MiniGitRef::Init() {
   std::ofstream head_file(".git/HEAD");
   head_file << "ref: refs/heads/main\n";
 }
-
+/**
+ * @brief 获取当前HEAD指向的提交哈希
+ * 
+ * 解析HEAD文件，返回当前工作分支或分离HEAD状态下指向的提交哈希。
+ * 支持符号引用解析：HEAD → "ref: refs/heads/main" → 读取分支文件 → 提交哈希
+ * 
+ * @return std::string 当前HEAD指向的40字符SHA-1提交哈希
+ * @note 如果HEAD文件损坏或指向不存在的引用，行为未定义
+ */
 std::string MiniGitRef::GetCurrentCommit() const {
   // 获取当前HEAD指向的提交哈希
   std::string head_content = ReadRefFile(HEAD_path_);
@@ -25,7 +33,7 @@ std::string MiniGitRef::GetCurrentCommit() const {
     branch_path.erase(branch_path.find_last_not_of("\n\r") + 1);
     return ReadRefFile(".git/" + branch_path);
   }
-  // 如果HEAD直接是提交哈希, 一般而言不会是直接提交哈希
+  // 如果HEAD直接存储了提交哈希, 则直接返回该哈希
   return head_content;
 }
 /**
