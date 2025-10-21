@@ -55,6 +55,6 @@ public:
 private:
   // 辅助函数
   void WriteRefFile(const std::string &path, const std::string &content);
-  auto ReadRefFile(const std::string &path) -> std::string const;
+  auto ReadRefFile(const std::string &path) const -> std::string;
   std::filesystem::path HEAD_path_ = ".git/HEAD";
 };
