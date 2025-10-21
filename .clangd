@@ -1,0 +1,28 @@
+CompileFlags:
+  Add: [-std=c++20]
+  Compiler: g++
+
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None
+
+Index:
+  Background: Build
+
+Completion:
+  AllScopes: true
+  IncludeIneligibleResults: false
+
+Hover:
+  ShowAKA: false
+
+InlayHints:
+  Enabled: false
+  ParameterNames: No
+  DeducedTypes: No
+  Designators: No
+  BlockEnd: No
+  TypeNameLimit: 24
+
+Memory:
+  BackgroundIndex: 1500
