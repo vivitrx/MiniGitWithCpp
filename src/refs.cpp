@@ -10,10 +10,29 @@ namespace fs = std::filesystem;
  * @brief 初始化Git引用系统
  */
 void MiniGitRef::Init() {
-  fs::create_directory(".git/refs/heads");
-  std::ofstream main_file(".git/refs/heads/main");
-  std::ofstream head_file(".git/HEAD");
-  head_file << "ref: refs/heads/main\n";
+  try {
+    // 创建必要的目录结构
+    fs::create_directories(".git/refs/heads");
+
+    // 创建 HEAD 文件
+    std::ofstream head_file(".git/HEAD");
+    if (!head_file) {
+      throw std::runtime_error("Failed to create .git/HEAD file");
+    }
+    head_file << "ref: refs/heads/main\n";
+    head_file.close();
+
+    // 创建 main 分支文件（初始为空，等待第一次提交）
+    std::ofstream main_file(".git/refs/heads/main");
+    if (!main_file) {
+      throw std::runtime_error("Failed to create main branch file");
+    }
+    main_file.close();
+
+  } catch (const std::exception &e) {
+    std::cerr << "Git initialization failed: " << e.what() << std::endl;
+    throw;
+  }
 }
 /**
  * @brief 获取当前HEAD指向的提交哈希
@@ -178,7 +197,7 @@ std::string MiniGitRef::GetCurrentBranchName() const {
  *
  * 创建新分支引用文件，指向当前HEAD所指向的提交。
  * 对应Git命令：git branch <name>（基于当前HEAD创建分支）
- * 
+ *
  * @param name 新分支的名称
  * @return std::string 新分支指向的提交哈希（40字符SHA-1）
  * @throw std::runtime_error 分支已存在、HEAD无效或文件操作失败
