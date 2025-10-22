@@ -19,7 +19,7 @@ void MiniGitRef::Init() {
     if (!head_file) {
       throw std::runtime_error("Failed to create .git/HEAD file");
     }
-    head_file << "ref: refs/heads/main\n";
+    head_file << "ref: refs/heads/main\n"; // 默认工作在 main 分支上
     head_file.close();
 
     // 创建 main 分支文件（初始为空，等待第一次提交）
