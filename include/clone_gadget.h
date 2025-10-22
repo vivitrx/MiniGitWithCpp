@@ -29,7 +29,8 @@ std::string write_tree(const std::string dir_path);
 std::pair<std::string, std::string>
 object_path_from_sha(const std::string &sha);
 
-void commit_tree(std::string treeSha, std::string parSha, std::string comMsg);
+auto commit_tree(std::string treeSha, std::string parSha, std::string comMsg)
+    -> std::string;
 
 bool git_init(const std::string &dir);
 

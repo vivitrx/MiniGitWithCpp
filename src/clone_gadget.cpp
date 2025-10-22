@@ -125,25 +125,72 @@ object_path_from_sha(const std::string &sha) {
   return std::make_pair(folderpath, filepath);
 }
 
-void commit_tree(std::string treeSha, std::string parSha, std::string comMsg) {
+/**
+ * @brief 创建Git提交对象并存储到对象数据库
+ *
+ * 该函数实现Git提交对象的创建，包括：
+ * -
+ * 构建提交对象的内容格式（包含tree哈希、父提交哈希、作者信息、提交者信息、提交消息）
+ * - 计算提交对象的SHA-1哈希
+ * - 压缩提交对象内容
+ * - 将压缩后的对象存储到.git/objects目录中
+ *
+ * @param treeSha 本次提交对应的tree对象的SHA-1哈希值（40字符十六进制字符串）
+ * @param parSha 父提交的SHA-1哈希值，可为空字符串表示首次提交
+ * @param comMsg 提交消息内容
+ *
+ * @note 提交对象格式遵循Git规范：
+ *       "commit <size>\0tree <tree_sha>\nparent <parent_sha>\nauthor <name>
+ * <email> <timestamp> <timezone>\ncommitter <name> <email> <timestamp>
+ * <timezone>\n\n<commit_message>\n"
+ *
+ * @warning 当前实现使用硬编码的作者和提交者信息（XXX YYY <xxx.yyy@gmail.com>
+ * 1620000000 +0000） 在实际应用中应该使用真实的用户信息和时间戳
+ */
+auto commit_tree(std::string treeSha, std::string parSha, std::string comMsg)
+    -> std::string {
+  // 构建提交对象的主体内容
   std::ostringstream commit_body;
   commit_body << "tree " << treeSha << '\n';
-  commit_body << "parent " << parSha << '\n';
+
+  // 只有当父提交哈希非空时才添加parent行（首次提交没有父提交）
+  if (!parSha.empty()) {
+    commit_body << "parent " << parSha << '\n';
+  }
+
+  // 添加作者和提交者信息（当前为硬编码值）
   commit_body << "author XXX YYY <xxx.yyy@gmail.com> 1620000000 +0000\n";
   commit_body << "committer XXX YYY <xxx.yyy@gmail.com> 1620000000 +0000\n";
+
+  // 添加提交消息（前面需要空行分隔）
   commit_body << '\n' << comMsg << '\n';
+
+  // 构建完整的提交对象格式：类型 + 大小 + 空字符 + 内容
   std::string commit = "commit " + std::to_string(commit_body.str().size()) +
                        '\x00' + commit_body.str();
-  std::string tree_sha = sha_file(commit);
-  std::cout << tree_sha;
-  auto [folderpath, filepath] = object_path_from_sha(tree_sha);
+
+  // 计算提交对象的SHA-1哈希
+  std::string commit_sha = sha_file(commit);
+
+  // 输出提交哈希到标准输出（供调用者使用）
+  std::cout << commit_sha;
+
+  // 获取对象存储路径（前2字符作为目录，剩余38字符作为文件名）
+  auto [folderpath, filepath] = object_path_from_sha(commit_sha);
+
+  // 创建对象存储目录（如果不存在）
   std::filesystem::create_directories(folderpath);
+
+  // 压缩提交对象内容
   uLong bound = compressBound(commit.size());
   unsigned char compressedData[bound];
   compressFile(commit, &bound, compressedData);
+
+  // 将压缩后的对象写入到对象数据库
   std::ofstream output_file(filepath, std::ios::binary);
   output_file.write((char *)compressedData, bound);
   output_file.close();
+  return commit_sha;
 }
 
 bool git_init(const std::string &dir) {
@@ -458,7 +505,8 @@ std::string decompress_string(const std::string &compressed_str) {
 
     // 如果解压缩数据量增加，将新数据追加到结果字符串
     if (decompressed_str.size() < d_stream.total_out) {
-      decompressed_str.append(buffer, d_stream.total_out - decompressed_str.size());
+      decompressed_str.append(buffer,
+                              d_stream.total_out - decompressed_str.size());
     }
   } while (status == Z_OK); // 继续循环直到解压缩完成或出错
 
@@ -809,71 +857,70 @@ int clone(std::string url, std::string dir) {
       std::string hash = digest_to_hash(digest);
       current_position += 20;
 
-  // 从本地对象库中读取基础对象内容
-  std::ifstream file(dir + "/.git/objects/" + hash.insert(2, "/"));
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  std::string file_contents = buffer.str();
-  std::string base_object_contents = decompress_string(file_contents);
+      // 从本地对象库中读取基础对象内容
+      std::ifstream file(dir + "/.git/objects/" + hash.insert(2, "/"));
+      std::stringstream buffer;
+      buffer << file.rdbuf();
+      std::string file_contents = buffer.str();
+      std::string base_object_contents = decompress_string(file_contents);
 
-  // 提取并移除基础对象的类型前缀
-  std::string object_type_extracted =
-      base_object_contents.substr(0, base_object_contents.find(" "));
-  base_object_contents =
-      base_object_contents.substr(base_object_contents.find('\0') + 1);
+      // 提取并移除基础对象的类型前缀
+      std::string object_type_extracted =
+          base_object_contents.substr(0, base_object_contents.find(" "));
+      base_object_contents =
+          base_object_contents.substr(base_object_contents.find('\0') + 1);
 
-  // 应用delta数据到基础对象，重建完整对象
-  std::string delta_contents =
-      decompress_string(pack.substr(current_position));
-  // 这里最难，前面的逻辑只能算给鱼刮鱼鳞之类的小菜，apply_delta()
-  // 这一步才是烹饪硬菜
-  std::string reconstructed_contents =
-      apply_delta(delta_contents, base_object_contents);
+      // 应用delta数据到基础对象，重建完整对象
+      std::string delta_contents =
+          decompress_string(pack.substr(current_position));
+      // 这里最难，前面的逻辑只能算给鱼刮鱼鳞之类的小菜，apply_delta()
+      // 这一步才是烹饪硬菜
+      std::string reconstructed_contents =
+          apply_delta(delta_contents, base_object_contents);
 
-  // 重建对象的完整格式（类型+长度+内容）
-  reconstructed_contents = object_type_extracted + ' ' +
-                           std::to_string(reconstructed_contents.length()) +
-                           '\0' + reconstructed_contents;
+      // 重建对象的完整格式（类型+长度+内容）
+      reconstructed_contents = object_type_extracted + ' ' +
+                               std::to_string(reconstructed_contents.length()) +
+                               '\0' + reconstructed_contents;
 
-  // 计算重建对象的哈希并存储到本地对象库
-  std::string object_hash = sha_file(reconstructed_contents);
-  compress_and_store(object_hash.c_str(), reconstructed_contents, dir);
+      // 计算重建对象的哈希并存储到本地对象库
+      std::string object_hash = sha_file(reconstructed_contents);
+      compress_and_store(object_hash.c_str(), reconstructed_contents, dir);
 
-  // 跳过已处理的delta数据
-  std::string compressed_delta = compress_string(delta_contents);
-  current_position += compressed_delta.length();
+      // 跳过已处理的delta数据
+      std::string compressed_delta = compress_string(delta_contents);
+      current_position += compressed_delta.length();
 
-  // 如果当前对象是master分支的commit，保存其内容
-  if (hash.compare(packhash) == 0) {
-    master_commit_contents =
-        reconstructed_contents.substr(reconstructed_contents.find('\0'));
-        
-  }
-} else { // 标准Git对象处理（commit=1, tree=2, blob=其他）
-  // 解压缩对象数据内容
-  std::string object_contents =
-      decompress_string(pack.substr(current_position));
-  current_position += compress_string(object_contents).length();
+      // 如果当前对象是master分支的commit，保存其内容
+      if (hash.compare(packhash) == 0) {
+        master_commit_contents =
+            reconstructed_contents.substr(reconstructed_contents.find('\0'));
+      }
+    } else { // 标准Git对象处理（commit=1, tree=2, blob=其他）
+      // 解压缩对象数据内容
+      std::string object_contents =
+          decompress_string(pack.substr(current_position));
+      current_position += compress_string(object_contents).length();
 
-  // 根据对象类型构建对象头信息
-  std::string object_type_str = (object_type == 1)   ? "commit "
-                                : (object_type == 2) ? "tree "
-                                                     : "blob ";
-  object_contents = object_type_str +
-                    std::to_string(object_contents.length()) + '\0' +
-                    object_contents;
+      // 根据对象类型构建对象头信息
+      std::string object_type_str = (object_type == 1)   ? "commit "
+                                    : (object_type == 2) ? "tree "
+                                                         : "blob ";
+      object_contents = object_type_str +
+                        std::to_string(object_contents.length()) + '\0' +
+                        object_contents;
 
-  // 计算对象哈希并存储到本地对象库
-  std::string object_hash = compute_sha1(object_contents, false);
-  std::string compressed_object = compress_string(object_contents);
-  compress_and_store(object_hash.c_str(), object_contents, dir);
+      // 计算对象哈希并存储到本地对象库
+      std::string object_hash = compute_sha1(object_contents, false);
+      std::string compressed_object = compress_string(object_contents);
+      compress_and_store(object_hash.c_str(), object_contents, dir);
 
-  // 如果当前对象是master分支的commit，保存其内容
-  if (object_hash.compare(packhash) == 0) {
-    master_commit_contents =
-        object_contents.substr(object_contents.find('\0'));
-  }
-}
+      // 如果当前对象是master分支的commit，保存其内容
+      if (object_hash.compare(packhash) == 0) {
+        master_commit_contents =
+            object_contents.substr(object_contents.find('\0'));
+      }
+    }
   }
 
   // 从master commit中提取tree哈希并恢复整个文件树结构
