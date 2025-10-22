@@ -47,3 +47,8 @@ _deps
 
 build/
 vcpkg_installed
+.cache/clangd/index/clone_gadget.cpp.B1F59B8BEF365344.idx
+.cache/clangd/index/clone_gadget.h.2EC393AD61CB9CEF.idx
+.cache/clangd/index/refs.cpp.B26F2EAD49838837.idx
+.cache/clangd/index/refs.h.7915C6FDB989B873.idx
+.cache/clangd/index/Server.cpp.180904343722969F.idx
