@@ -183,7 +183,8 @@ int main(int argc, char *argv[]) {
       std::cerr << "No such flag " << '\n';
       return EXIT_FAILURE;
     }
-    commit_tree(treeSha, parentSha, commitMsg);
+    auto commit_sha = commit_tree(treeSha, parentSha, commitMsg);
+    GitRefsSys.UpdateCurrentBranch(commit_sha);
   } else if (command == "clone") {
     if (argc < 3) {
       std::cerr << "No repository provided.\n";
