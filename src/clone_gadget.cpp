@@ -847,6 +847,7 @@ int clone(std::string url, std::string dir) {
   if (hash.compare(packhash) == 0) {
     master_commit_contents =
         reconstructed_contents.substr(reconstructed_contents.find('\0'));
+        
   }
 } else { // 标准Git对象处理（commit=1, tree=2, blob=其他）
   // 解压缩对象数据内容
