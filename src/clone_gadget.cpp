@@ -367,7 +367,38 @@ int read_length(const std::string &pack, int *pos) {
   (*pos)++; // 移动到下一个要解析的位置
   return length;
 }
+/*
+[ Packfile 中的 OBJ_REF_DELTA 对象 ]
++--------+---------------------+-----------------------------------+
+| Type   | Base SHA-1 (20Byte) | Delta Data                        |
++--------+---------------------+-----------------------------------+
+| 0x72   | a1 b2 c3 d4 e5...   | base_len + target_len + 指令序列   |
++--------+---------------------+-----------------------------------+
 
+Delta Data 是你在这个函数里要解析的数据结构，他就是 delta_contents
+[ Delta Data 展开 ]
++----------------+----------------+-------------------------------+
+| base_len (varint) | target_len (varint) | Instruction 1 | Instruction 2 | ...
+|
++----------------+----------------+-------------------------------+
+| 1-4 bytes      | 1-4 bytes      | 变长指令数据                   |
++----------------+----------------+-------------------------------+
+变长指令数据的内容类似于:
+COPY 0-11 + ADD "very " + COPY 11-14
+而一个变长指令的结构看起来是：
+[ COPY 指令的二进制流 ]
++--------+-----------------+-----------------+-----------------+
+| 指令字节 | 偏移量字节 (可选) | 长度字节 (可选)   | 后续指令...       |
++--------+-----------------+-----------------+-----------------+
+| 1 byte | 0-4 bytes       | 0-3 bytes       |                 |
++--------+-----------------+-----------------+-----------------+
+而指令字节 (1 byte)的结构是:
++-----+-----+-----+-----+-----+-----+-----+-----+
+| 1   | b6  | b5  | b4  | b3  | b2  | b1  | b0  |
++-----+-----+-----+-----+-----+-----+-----+-----+
+| MSB | b4-b6为长度控制位| b0-b3为偏移量控制位    |
++-----+-----+-----+-----+-----+-----+-----+-----+
+*/
 /**
  * @brief 应用Git delta压缩数据到基础对象，重建完整对象内容
  * @param delta_contents delta压缩指令数据
@@ -395,7 +426,21 @@ std::string apply_delta(const std::string &delta_contents,
       int copy_size = 0;                  // 复制的数据长度
       int bytes_processed_for_offset = 0; // 已处理的偏移量字节数
 
-      // 解析4个字节的复制偏移量（可选，由指令字节的位3-0控制）
+      /*
+      // 下面解析偏移量的逻辑类似于:
+      copy_offset <<= 8;
+      int index_in_offset = 4; // 因为offset在COPY指令数据流中的
+      // 起点是第2个字节(即delta_contents[1])
+      // 终点是第5个字节(即delta_contents[4])，共4个字节
+      // Git delta包使用小端序存储字节(x86/64的内存架构是这样)
+      // 所以我们得先读高位再读低位才能拼出正确的 copy_offset
+      for (auto bit 依次为 b3 b2 b1 b0) {
+        if (bit == 1) { // 也就是说该bit被设置了
+          copy_offset += delta_contents[index_in_offset--];
+        }
+      }
+      */
+      // 解析偏移量(共4个字节)（可选，由指令字节的位3-0控制，注意，b3到b0是4个bit）
       for (int i = 3; i >= 0; i--) {
         copy_offset <<= 8;                    // 左移为新的字节腾出空间
         if (current_instruction & (1 << i)) { // 检查对应位是否设置
@@ -404,8 +449,21 @@ std::string apply_delta(const std::string &delta_contents,
           bytes_processed_for_offset++;
         }
       }
-
-      // 解析3个字节的复制长度（可选，由指令字节的位6-4控制）
+      /*
+      // 下面解析长度的逻辑类似于:
+      copy_size <<= 8;
+      int index_in_size = 7; // 因为"长度字节"在COPY指令数据流中的
+      // 起点是第6个字节(即delta_contents[5])
+      // 终点是第8个字节(即delta_contents[7])，共3个字节
+      // Git delta包使用小端序存储字节(x86/64的内存架构是这样)
+      // 所以我们得先读高位再读低位才能拼出正确的 copy_size
+      for (auto bit 依次为 b6 b5 b4) {
+        if (bit == 1) { // 也就是说该bit被设置了
+          copy_size += delta_contents[index_in_size--];
+        }
+      }
+      */
+      // 解析长度(共3个字节)（可选，由指令字节的位6-4控制）
       int bytes_processed_for_size = 0;
       for (int i = 6; i >= 4; i--) {
         copy_size <<= 8;                      // 左移为新的字节腾出空间
@@ -851,8 +909,9 @@ int clone(std::string url, std::string dir) {
     // 根据对象类型进行不同的处理逻辑
     if (object_type == 6) { // 偏移量delta对象（暂不支持）
       throw std::invalid_argument("Offset deltas not implemented.\n");
-    } else if (object_type == 7) { // 引用delta对象处理
-      // 提取基础对象的20字节SHA-1引用(也可以被称为摘要)
+    } else if (object_type ==
+               7) { // 处理引用delta对象，也就是基于 SHA-1 的 Delta 对象
+      // 提取基础对象的20字节SHA-1摘要
       std::string digest = pack.substr(current_position, 20);
       std::string hash = digest_to_hash(digest);
       current_position += 20;
@@ -873,7 +932,7 @@ int clone(std::string url, std::string dir) {
       // 应用delta数据到基础对象，重建完整对象
       std::string delta_contents =
           decompress_string(pack.substr(current_position));
-      // 这里最难，前面的逻辑只能算给鱼刮鱼鳞之类的小菜，apply_delta()
+      // 这里，也就是apply_delta()，最难，前面的逻辑只能算给鱼刮鱼鳞之类的小菜
       // 这一步才是烹饪硬菜
       std::string reconstructed_contents =
           apply_delta(delta_contents, base_object_contents);
