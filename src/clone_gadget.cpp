@@ -375,11 +375,10 @@ int read_length(const std::string &pack, int *pos) {
 | 0x72   | a1 b2 c3 d4 e5...   | base_len + target_len + 指令序列   |
 +--------+---------------------+-----------------------------------+
 
-Delta Data 是你在这个函数里要解析的数据结构，他就是 delta_contents
+Delta Data 是你在这个函数里要解析的数据结构，他就是下面代码中的 delta_contents
 [ Delta Data 展开 ]
 +----------------+----------------+-------------------------------+
 | base_len (varint) | target_len (varint) | Instruction 1 | Instruction 2 | ...
-|
 +----------------+----------------+-------------------------------+
 | 1-4 bytes      | 1-4 bytes      | 变长指令数据                   |
 +----------------+----------------+-------------------------------+
@@ -421,7 +420,7 @@ std::string apply_delta(const std::string &delta_contents,
     unsigned char current_instruction =
         delta_contents[current_position_in_delta++];
 
-    if (current_instruction & 0x80) {     // 最高位为1：复制指令
+    if (current_instruction & 0x80) {     // 最高位为1：COPY指令
       int copy_offset = 0;                // 从基础对象的复制起始位置
       int copy_size = 0;                  // 复制的数据长度
       int bytes_processed_for_offset = 0; // 已处理的偏移量字节数
@@ -488,7 +487,7 @@ std::string apply_delta(const std::string &delta_contents,
       current_position_in_delta +=
           bytes_processed_for_size + bytes_processed_for_offset;
 
-    } else { // 最高位为0：添加指令
+    } else { // 最高位为0：ADD指令
       // 直接从delta数据中添加新内容
       int add_size = current_instruction & 0x7F; // 提取低7位作为添加长度
       reconstructed_object +=
@@ -904,6 +903,7 @@ int clone(std::string url, std::string dir) {
     object_type = (pack[current_position] & 112) >> 4; // 112是二进制11100000
 
     // 读取对象的长度（变长编码）
+    // 解释：https://pastebin.com/9rbJ8MYE
     int object_length = read_length(pack, &current_position);
 
     // 根据对象类型进行不同的处理逻辑
@@ -911,7 +911,17 @@ int clone(std::string url, std::string dir) {
       throw std::invalid_argument("Offset deltas not implemented.\n");
     } else if (object_type ==
                7) { // 处理引用delta对象，也就是基于 SHA-1 的 Delta 对象
-      // 提取基础对象的20字节SHA-1摘要
+      /*
+      [ Pack 中的 Delta 对象 ]
+      +--------+---------------------+----------------+
+      | 类型头  | 基础对象哈希/SHA-1   | Delta 指令流    |
+      +--------+---------------------+----------------+
+      | 0x72   | 20字节              | COPY/ADD指令    |
+      +--------+---------------------+----------------+
+      */
+      // 提取基础对象的20字节SHA-1哈希以方便后续打开基础对象文件
+      // 注意，这一步读取的digest是二进制的，需要用 digest_to_hash() 转成16进制
+      // 才能在.git/object里找到对应文件
       std::string digest = pack.substr(current_position, 20);
       std::string hash = digest_to_hash(digest);
       current_position += 20;
@@ -922,7 +932,14 @@ int clone(std::string url, std::string dir) {
       buffer << file.rdbuf();
       std::string file_contents = buffer.str();
       std::string base_object_contents = decompress_string(file_contents);
-
+      /*
+      [ 解压后的基础对象（如 Blob） ]
+      +----------------+------+----------------+
+      | "blob 123\0"   |      | 实际文件内容     |
+      +----------------+------+----------------+
+       ↑          ↑
+       类型前缀    终止符'\0'
+       */
       // 提取并移除基础对象的类型前缀
       std::string object_type_extracted =
           base_object_contents.substr(0, base_object_contents.find(" "));
@@ -932,7 +949,7 @@ int clone(std::string url, std::string dir) {
       // 应用delta数据到基础对象，重建完整对象
       std::string delta_contents =
           decompress_string(pack.substr(current_position));
-      // 这里，也就是apply_delta()，最难，前面的逻辑只能算给鱼刮鱼鳞之类的小菜
+      // apply_delta() 的实现是最难的部分，前面的逻辑只能算给鱼刮鱼鳞之类的小菜
       // 这一步才是烹饪硬菜
       std::string reconstructed_contents =
           apply_delta(delta_contents, base_object_contents);
