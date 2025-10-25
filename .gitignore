@@ -52,3 +52,4 @@ vcpkg_installed
 .cache/clangd/index/refs.cpp.B26F2EAD49838837.idx
 .cache/clangd/index/refs.h.7915C6FDB989B873.idx
 .cache/clangd/index/Server.cpp.180904343722969F.idx
+.cache/clangd/index/test_apply_delta.cpp.B1CC96FC2196E6CA.idx
