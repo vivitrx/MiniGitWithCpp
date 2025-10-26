@@ -75,8 +75,19 @@ TEST_F(ApplyDeltaTest, SimpleAddInstruction) {
     std::string base_contents = "";
     
     // 创建包含 ADD 指令的 delta 数据
-    // ADD 指令格式：0xxxxxxx + 数据内容 (xxxxxxx 是长度)
+    // Delta 格式：base_len + target_len + 指令序列
+    // base_len: 0 (基础内容长度为0)
+    // target_len: 5 (目标内容长度为5)
+    // ADD 指令：0x05 + "Hello"
     std::string delta_contents;
+    
+    // base_len = 0 (使用变长编码)
+    delta_contents.push_back(0x00);
+    
+    // target_len = 5 (使用变长编码)
+    delta_contents.push_back(0x05);
+    
+    // ADD 指令：0x05 + 数据内容
     delta_contents.push_back(0x05); // ADD 指令，长度 5
     delta_contents += "Hello";
     
