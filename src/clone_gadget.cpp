@@ -341,7 +341,7 @@ void compress_and_store(const std::string &hash, const std::string &content,
  * @param pack 包含pack文件数据的字符串
  * @param pos 当前解析位置的指针，函数会更新此位置
  * @return 解析得到的长度值
- * @note 实现Git pack协议的变长编码解析，最高位为1表示继续读取下个字节
+ * @note 实现Git pack协议的变长编码解析，最高位为1表示继续读取下个字节 https://pastebin.com/9rbJ8MYE
  */
 int read_length(const std::string &pack, int *pos) {
   int length = 0;
@@ -375,15 +375,17 @@ int read_length(const std::string &pack, int *pos) {
 | 0x72   | a1 b2 c3 d4 e5...   | base_len + target_len + 指令序列   |
 +--------+---------------------+-----------------------------------+
 
-Delta Data 是你在这个函数里要解析的数据结构，他就是下面代码中的 delta_contents
 [ Delta Data 展开 ]
+Delta Data 是你在这个函数里要解析的数据结构，也就是下面实际代码中的变量 delta_contents
 +----------------+----------------+-------------------------------+
 | base_len (varint) | target_len (varint) | Instruction 1 | Instruction 2 | ...
 +----------------+----------------+-------------------------------+
 | 1-4 bytes      | 1-4 bytes      | 变长指令数据                   |
 +----------------+----------------+-------------------------------+
-变长指令数据的内容类似于:
+
+变长指令流的内容类似于:
 COPY 0-11 + ADD "very " + COPY 11-14
+
 而一个变长指令的结构看起来是：
 [ COPY 指令的二进制流 ]
 +--------+-----------------+-----------------+-----------------+
@@ -899,6 +901,9 @@ int clone(std::string url, std::string dir) {
   +------+------+------+------+---------+---------+-------------------+------+------+------+-------+----------+---------+
   | 0x50 | 0x41 | 0x43 | 0x4B | 0x00    | 0x02    | 0x00     | 0x00   | 0x00 | 0x00 | 0x00 | 0x03 | ...      | ...      |
   +------+------+------+------+------+------+------+------------------+---------------------------+----------+----------+
+                                                                      ^
+                                                                      |
+                                                                      你要解析文件头在这里
   */
   // 解析pack文件头，提取对象数量（4字节大端序）
   int num_objects = 0;
@@ -914,11 +919,12 @@ int clone(std::string url, std::string dir) {
 
   // 遍历pack文件中的所有Git对象
   for (int object_index = 0; object_index < num_objects; object_index++) {
+    // 也就是说，如果我只是想知道对象的类型和长度，那么完整对象和引用delta对象的解析方法是一样的？
+    // https://pastebin.com/LZTk8pxR
     // 从对象数据的第一个字节提取对象类型（高3位）
     object_type = (pack[current_position] & 112) >> 4; // 112是二进制11100000
 
     // 读取对象的长度（变长编码）
-    // 解释：https://pastebin.com/9rbJ8MYE
     int object_length = read_length(pack, &current_position);
 
     // 根据对象类型进行不同的处理逻辑
@@ -929,10 +935,13 @@ int clone(std::string url, std::string dir) {
       /*
       [ Pack 中的 Delta 对象 ]
       +--------+---------------------+----------------+
-      | 类型头  | 基础对象哈希/SHA-1   | Delta 指令流    |
+      | 类型头  | 基础对象哈希/SHA-1   | Delta 的元数据和指令流    |
       +--------+---------------------+----------------+
-      | 0x72   | 20字节              | COPY/ADD指令    |
+      | 0x72   | 20字节              | base_len + target_len + 指令序列    |
       +--------+---------------------+----------------+
+                ^
+                |
+                current_position 目前指向这里
       */
       // 提取基础对象的20字节SHA-1哈希以方便后续打开基础对象文件
       // 注意，这一步读取的digest是二进制的，需要用 digest_to_hash() 转成16进制
