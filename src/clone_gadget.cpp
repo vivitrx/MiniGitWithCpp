@@ -250,45 +250,81 @@ std::string compute_sha1(const std::string &data, bool print_out) {
   return ss.str();
 }
 
+/**
+ * @brief 使用zlib压缩文件数据
+ * @param input 输入文件指针（待压缩的数据源）
+ * @param output 输出文件指针（压缩后的数据目标）
+ * @return 成功返回EXIT_SUCCESS，失败返回EXIT_FAILURE
+ * @note 使用DEFLATE算法进行压缩，压缩级别为Z_DEFAULT_COMPRESSION
+ */
 int compress(FILE *input, FILE *output) {
+  // 初始化zlib压缩流结构体，所有字段清零
   z_stream stream = {0};
+
+  // 初始化压缩流，使用默认压缩级别
   if (deflateInit(&stream, Z_DEFAULT_COMPRESSION) != Z_OK) {
     std::cerr << "Failed to initialize compression stream.\n";
     return EXIT_FAILURE;
   }
-  char in[CHUNK];
-  char out[CHUNK];
-  int ret;
-  int flush;
+
+  // 创建输入和输出缓冲区
+  char in[CHUNK];  // 输入缓冲区，用于存储从输入文件读取的原始数据
+  char out[CHUNK]; // 输出缓冲区，用于存储压缩后的数据
+
+  int ret;   // 存储deflate函数的返回值
+  int flush; // 存储刷新模式（Z_NO_FLUSH或Z_FINISH）
+
+  // 主循环：持续读取输入数据直到文件结束
   do {
+    // 从输入文件读取数据到输入缓冲区
     stream.avail_in = fread(in, 1, CHUNK, input);
+    // 设置输入数据的内存地址
     stream.next_in = reinterpret_cast<unsigned char *>(in);
+
+    // 检查读取是否出错
     if (ferror(input)) {
-      (void)deflateEnd(&stream);
+      (void)deflateEnd(&stream); // 清理压缩流
       std::cerr << "Failed to read from input file.\n";
       return EXIT_FAILURE;
     }
+
+    // 判断是否到达文件末尾，确定刷新模式
     flush = feof(input) ? Z_FINISH : Z_NO_FLUSH;
+
+    // 内层循环：处理当前读取的数据块
     do {
+      // 设置输出缓冲区
       stream.avail_out = CHUNK;
       stream.next_out = reinterpret_cast<unsigned char *>(out);
+
+      // 执行压缩操作
       ret = deflate(&stream, flush);
+
+      // 检查压缩是否出错
       if (ret == Z_NEED_DICT || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
-        (void)deflateEnd(&stream);
+        (void)deflateEnd(&stream); // 清理压缩流
         std::cerr << "Failed to compress file.\n";
         return EXIT_FAILURE;
       }
+
+      // 计算压缩后数据的实际大小
       size_t have = CHUNK - stream.avail_out;
+
+      // 将压缩后的数据写入输出文件
       if (fwrite(out, 1, have, output) != have || ferror(output)) {
-        (void)deflateEnd(&stream);
+        (void)deflateEnd(&stream); // 清理压缩流
         std::cerr << "Failed to write to output file.\n";
         return EXIT_FAILURE;
       }
-    } while (stream.avail_out == 0);
-  } while (flush != Z_FINISH);
+    } while (stream.avail_out == 0); // 继续直到输出缓冲区满
+
+  } while (flush != Z_FINISH); // 继续直到所有数据压缩完成
+
+  // 清理压缩流
   if (deflateEnd(&stream) != Z_OK) {
     return EXIT_FAILURE;
   }
+
   return EXIT_SUCCESS;
 }
 
@@ -341,7 +377,8 @@ void compress_and_store(const std::string &hash, const std::string &content,
  * @param pack 包含pack文件数据的字符串
  * @param pos 当前解析位置的指针，函数会更新此位置
  * @return 解析得到的长度值
- * @note 实现Git pack协议的变长编码解析，最高位为1表示继续读取下个字节 https://pastebin.com/9rbJ8MYE
+ * @note 实现Git pack协议的变长编码解析，最高位为1表示继续读取下个字节
+ * https://pastebin.com/9rbJ8MYE
  */
 int read_length(const std::string &pack, int *pos) {
   int length = 0;
@@ -376,7 +413,8 @@ int read_length(const std::string &pack, int *pos) {
 +--------+---------------------+-----------------------------------+
 
 [ Delta Data 展开 ]
-Delta Data 是你在这个函数里要解析的数据结构，也就是下面实际代码中的变量 delta_contents
+Delta Data 是你在这个函数里要解析的数据结构，也就是下面实际代码中的变量
+delta_contents
 +----------------+----------------+-------------------------------+
 | base_len (varint) | target_len (varint) | Instruction 1 | Instruction 2 | ...
 +----------------+----------------+-------------------------------+
@@ -647,14 +685,56 @@ std::string compress_string(const std::string &input_str) {
 size_t write_callback(void *received_data, size_t element_size,
                       size_t num_element, void *userdata) {
   size_t total_size = element_size * num_element;
-  std::string received_text((char *)received_data, num_element);
+  std::string received_text((char *)received_data, total_size);
   std::string *master_hash = (std::string *)userdata;
-  if (received_text.find("servie=git-upload-pack") == std::string::npos) {
-    size_t hash_pos = received_text.find("refs/heads/master\n");
-    if (hash_pos != std::string::npos) {
-      *master_hash = received_text.substr(hash_pos - 41, 40);
+  
+  // 调试输出
+  std::cerr << "Debug: received_text length: " << received_text.length() << std::endl;
+  std::cerr << "Debug: received_text: " << received_text.substr(0, 200) << std::endl;
+  
+  // Git 协议响应格式：每行以4字符的长度开头
+  // 我们需要解析这种格式来找到哈希值
+  size_t pos = 0;
+  while (pos < received_text.length()) {
+    if (pos + 4 > received_text.length()) break;
+    
+    // 读取行长度（十六进制）
+    std::string len_str = received_text.substr(pos, 4);
+    int line_len;
+    try {
+      line_len = std::stoi(len_str, nullptr, 16);
+    } catch (...) {
+      break;
     }
+    
+    if (line_len == 0) break; // 结束标记
+    
+    if (pos + 4 + line_len > received_text.length()) break;
+    
+    std::string line = received_text.substr(pos + 4, line_len);
+    
+    // 查找 HEAD 行，这通常包含 master 分支的哈希值
+    if (line.find("HEAD") != std::string::npos) {
+      // HEAD 行格式：hash capabilities...
+      size_t space_pos = line.find(' ');
+      if (space_pos != std::string::npos && space_pos >= 40) {
+        *master_hash = line.substr(0, 40);
+        std::cerr << "Debug: found master hash from HEAD: " << *master_hash << std::endl;
+        break;
+      }
+    }
+    
+    // 查找 master 分支的哈希值
+    size_t hash_pos = line.find("refs/heads/master");
+    if (hash_pos != std::string::npos && hash_pos >= 41) {
+      *master_hash = line.substr(hash_pos - 41, 40);
+      std::cerr << "Debug: found master hash: " << *master_hash << std::endl;
+      break;
+    }
+    
+    pos += 4 + line_len;
   }
+  
   return total_size;
 }
 
@@ -691,8 +771,8 @@ std::pair<std::string, std::string> curl_request(const std::string &url) {
     // 第二步：通过git-upload-pack服务下载pack文件数据
     curl_easy_setopt(handle, CURLOPT_URL, (url + "/git-upload-pack").c_str());
 
-    // 构建Git协议请求数据：want指定需要的对象，done表示请求结束
-    std::string postdata = "0032want " + packhash + "\n" + "00000009done\n";
+    // 构建Git协议请求数据：使用正确的Git协议格式
+    std::string postdata = "0032want " + packhash + "\n00000009done\n";
     curl_easy_setopt(handle, CURLOPT_POSTFIELDS, postdata.c_str());
 
     // 设置pack文件数据的接收回调
@@ -704,15 +784,32 @@ std::pair<std::string, std::string> curl_request(const std::string &url) {
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(
         headers, "Content-Type: application/x-git-upload-pack-request");
+    headers = curl_slist_append(
+        headers, "Accept: application/x-git-upload-pack-result");
     curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
+    
+    // 设置超时和详细调试
+    curl_easy_setopt(handle, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, 10L);
+    curl_easy_setopt(handle, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(handle, CURLOPT_NOPROGRESS, 1L);
 
+    std::cerr << "Debug: starting pack file download..." << std::endl;
+    std::cerr << "Debug: POST data: " << postdata << std::endl;
     // 执行pack文件下载请求
-    curl_easy_perform(handle);
+    CURLcode res = curl_easy_perform(handle);
+    std::cerr << "Debug: curl result: " << curl_easy_strerror(res) << std::endl;
+    std::cerr << "Debug: pack file download completed" << std::endl;
 
     // 清理资源：释放curl句柄和HTTP头链表
     curl_easy_cleanup(handle);
     curl_slist_free_all(headers);
 
+    // 调试输出
+    std::cerr << "Debug: packhash length: " << packhash.length() << std::endl;
+    std::cerr << "Debug: packhash content: " << packhash << std::endl;
+    std::cerr << "Debug: pack length: " << pack.length() << std::endl;
+    
     // 返回pack文件数据和master分支哈希
     return {pack, packhash};
   } else {
@@ -874,6 +971,8 @@ void restore_tree(const std::string &tree_hash, const std::string &dir,
  * @return 执行成功返回EXIT_SUCCESS，失败返回EXIT_FAILURE
  */
 int clone(std::string url, std::string dir) {
+  std::cerr << "Debug: clone() started with url=" << url << ", dir=" << dir << std::endl;
+  
   // 创建目标目录并初始化Git仓库
   std::filesystem::create_directory(dir);
   if (git_init(dir) != true) {
@@ -881,8 +980,12 @@ int clone(std::string url, std::string dir) {
     return EXIT_FAILURE;
   }
 
+  std::cerr << "Debug: git_init completed, calling curl_request..." << std::endl;
+  
   // 通过HTTP请求获取远程仓库的pack文件和master分支哈希
   auto [pack, packhash] = curl_request(url);
+  
+  std::cerr << "Debug: curl_request completed" << std::endl;
 
   /*
   [ 原始 HTTP 响应 ]
@@ -890,16 +993,62 @@ int clone(std::string url, std::string dir) {
   | HTTP 头 (20字节)     | Pack 文件数据        | 校验和 (20字节)      |
   +---------------------+---------------------+---------------------+
   */
-  // 移除HTTP响应头（前20字节）和尾部的pack文件校验和（后20字节）
-  pack = pack.substr(20, pack.length() - 40);
+  // 检查pack数据是否足够长
+  if (pack.length() < 40) {
+    std::cerr << "Invalid pack data: too short\n";
+    return EXIT_FAILURE;
+  }
+  
+  std::cerr << "Debug: pack first 50 bytes: ";
+  for (size_t i = 0; i < std::min((size_t)50, pack.length()); i++) {
+    std::cerr << std::hex << (unsigned char)pack[i] << " ";
+  }
+  std::cerr << std::endl;
+  
+  // Git pack 文件通常以 "PACK" 开头，我们需要找到真正的 pack 数据开始位置
+  size_t pack_start = pack.find("PACK");
+  if (pack_start == std::string::npos) {
+    std::cerr << "Could not find PACK header in response\n";
+    return EXIT_FAILURE;
+  }
+  
+  std::cerr << "Debug: found PACK at position: " << pack_start << std::endl;
+  
+  // 简化处理：直接跳过前8个字节的头部，然后查找 PACK
+  std::string actual_pack_data;
+  
+  if (pack_start > 0) {
+    // 跳过头部，直接使用从 PACK 开始的数据
+    actual_pack_data = pack.substr(pack_start);
+    std::cerr << "Debug: skipping " << pack_start << " bytes of header" << std::endl;
+  } else {
+    actual_pack_data = pack;
+  }
+  
+  pack = actual_pack_data;
+  
+  std::cerr << "Debug: pack after extracting PACK data, length: " << pack.length() << std::endl;
+  std::cerr << "Debug: pack first 20 bytes: ";
+  for (size_t i = 0; i < std::min((size_t)20, pack.length()); i++) {
+    std::cerr << std::hex << (unsigned char)pack[i] << " ";
+  }
+  std::cerr << std::endl;
+  
+  // 检查 pack 数据是否以 PACK 开头
+  if (pack.length() < 4 || pack.substr(0, 4) != "PACK") {
+    std::cerr << "Error: pack data does not start with PACK" << std::endl;
+    return EXIT_FAILURE;
+  }
 
   /*
   [ Pack 文件内部结构 ]
   [ Pack 文件头 (12字节) ] [紧随其后的是Pack里的对象]
   +------+------+------+------+---------+---------+-------------------+----------------------------+----------+---------+------+
-  | 'P'  | 'A'  | 'C'  | 'K'  | 版本高位 | 版本低位 | 保留字段(2字节)    | 对象数量 (4字节大端序)      | 对象1... | 对象2... | 对象3... |
+  | 'P'  | 'A'  | 'C'  | 'K'  | 版本高位 | 版本低位 | 保留字段(2字节)    |
+  对象数量 (4字节大端序)      | 对象1... | 对象2... | 对象3... |
   +------+------+------+------+---------+---------+-------------------+------+------+------+-------+----------+---------+
-  | 0x50 | 0x41 | 0x43 | 0x4B | 0x00    | 0x02    | 0x00     | 0x00   | 0x00 | 0x00 | 0x00 | 0x03 | ...      | ...      |
+  | 0x50 | 0x41 | 0x43 | 0x4B | 0x00    | 0x02    | 0x00     | 0x00   | 0x00 |
+  0x00 | 0x00 | 0x03 | ...      | ...      |
   +------+------+------+------+------+------+------+------------------+---------------------------+----------+----------+
                                                                       ^
                                                                       |
@@ -914,11 +1063,16 @@ int clone(std::string url, std::string dir) {
 
   // 处理Git pack文件中的所有对象
   int object_type;
-  int current_position = 0;
+  int current_position = 12; // 跳过pack文件头（12字节）
   std::string master_commit_contents;
 
+  std::cerr << "Debug: num_objects = " << num_objects << std::endl;
+  std::cerr << "Debug: current_position starts at: " << current_position << std::endl;
+  
   // 遍历pack文件中的所有Git对象
   for (int object_index = 0; object_index < num_objects; object_index++) {
+    std::cerr << "Debug: processing object " << object_index << " at position " << current_position << std::endl;
+    
     // 也就是说，如果我只是想知道对象的类型和长度，那么完整对象和引用delta对象的解析方法是一样的？
     // https://pastebin.com/LZTk8pxR
     // 从对象数据的第一个字节提取对象类型（高3位）
@@ -926,6 +1080,9 @@ int clone(std::string url, std::string dir) {
 
     // 读取对象的长度（变长编码）
     int object_length = read_length(pack, &current_position);
+
+    std::cerr << "Debug: object_type = " << object_type << ", object_length = " << object_length << std::endl;
+    std::cerr << "Debug: after reading length, current_position = " << current_position << std::endl;
 
     // 根据对象类型进行不同的处理逻辑
     if (object_type == 6) { // 偏移量delta对象（暂不支持）
@@ -949,6 +1106,8 @@ int clone(std::string url, std::string dir) {
       std::string digest = pack.substr(current_position, 20);
       std::string hash = digest_to_hash(digest);
       current_position += 20;
+
+      std::cerr << "Debug: REF_DELTA object, base hash = " << hash << std::endl;
 
       // 从本地对象库中读取基础对象内容
       std::ifstream file(dir + "/.git/objects/" + hash.insert(2, "/"));
@@ -997,6 +1156,8 @@ int clone(std::string url, std::string dir) {
             reconstructed_contents.substr(reconstructed_contents.find('\0'));
       }
     } else { // 标准Git对象处理（commit=1, tree=2, blob=其他）
+      std::cerr << "Debug: standard object, trying to decompress from position " << current_position << std::endl;
+      
       // 解压缩对象数据内容
       std::string object_contents =
           decompress_string(pack.substr(current_position));
@@ -1027,6 +1188,16 @@ int clone(std::string url, std::string dir) {
   std::string tree_hash = master_commit_contents.substr(
       master_commit_contents.find("tree") + 5, 40);
   restore_tree(tree_hash, dir, dir);
+
+  // 创建master分支引用，指向master commit
+  std::filesystem::create_directories(dir + "/.git/refs/heads");
+  std::ofstream master_ref(dir + "/.git/refs/heads/master");
+  if (master_ref.is_open()) {
+    master_ref << packhash << std::endl;
+    master_ref.close();
+  } else {
+    std::cerr << "Failed to create master branch reference.\n";
+  }
 
   return EXIT_SUCCESS;
 }
