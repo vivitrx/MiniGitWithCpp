@@ -53,3 +53,16 @@ vcpkg_installed
 .cache/clangd/index/refs.h.7915C6FDB989B873.idx
 .cache/clangd/index/Server.cpp.180904343722969F.idx
 .cache/clangd/index/test_apply_delta.cpp.B1CC96FC2196E6CA.idx
+simplegit-test2/lib/simplegit.rb
+simplegit-test2/README
+simplegit-test2/Rakefile
+zlib_tutorial_for_beginners.md
+VSCode预览编辑器快捷键配置.md
+socket概念解释.md
+inet_pton解释.md
+Git网络协议学习指南.md
+curl库最简用法教程.md
+compress_function_guide.md
+clone_debug.log
+面试难点准备.md
+底层原理与八股文关联分析.md
