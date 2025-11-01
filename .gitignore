@@ -53,3 +53,9 @@ dkms.conf
 
 build
 vcpkg_installed
+.cache/clangd/index/commands.cpp.FB8A3883E4EA936F.idx
+.cache/clangd/index/commands.h.C7BDAD5FAF82D2C6.idx
+.cache/clangd/index/debug.h.E702FAC62BD2BA2E.idx
+.cache/clangd/index/git_clone.cpp.7225A97D2432C911.idx
+.cache/clangd/index/main.cpp.3FEA487250DC0533.idx
+src/cpp/include

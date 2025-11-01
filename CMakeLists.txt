@@ -17,6 +17,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -fno-inline -fno-omit
 # 查找依赖包
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(CURL REQUIRED)
 
 # 手动指定源文件和头文件（根据图片中的结构）
 set(SOURCE_FILES
@@ -37,6 +38,7 @@ add_executable(git ${SOURCE_FILES} ${HEADER_FILES})
 # 设置包含目录
 target_include_directories(git PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/include
 )
 
 # 设置目标属性
@@ -52,6 +54,7 @@ target_link_options(git PRIVATE
 target_link_libraries(git PRIVATE
   OpenSSL::Crypto
   ZLIB::ZLIB
+  CURL::libcurl
 )
 
 # 安装目标（可选）

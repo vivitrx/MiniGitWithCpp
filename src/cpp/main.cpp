@@ -5,6 +5,7 @@
 #include <iostream>   // 用于标准输入输出
 #include <ostream>
 #include <string> // 用于字符串处理
+#include "git_clone.h"
 
 int main(int argc, char *argv[]) {
   // Flush after every std::cout / std::cerr
@@ -93,6 +94,17 @@ int main(int argc, char *argv[]) {
     }
     std::cout << sha << std::endl;
     return 0;
+  } else if (std::string(argv[1]) == "clone") {
+    if (argc < 3) {
+      std::cerr << "No repository provided.\n";
+      return EXIT_FAILURE;
+    }
+    std::string url = argv[2];
+    std::string directory = argv[3];
+    if (clone(url, directory) != EXIT_SUCCESS) {
+      std::cerr << "Failed to clone repository.\n";
+      return EXIT_FAILURE;
+    }
   } else {
     std::cerr << "Unknown command " << command << '\n';
     return EXIT_FAILURE;
