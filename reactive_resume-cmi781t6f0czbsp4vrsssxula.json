@@ -1,0 +1,321 @@
+{
+  "basics": {
+    "name": "余昌迪",
+    "headline": "Creative and Innovative Web Developer",
+    "email": "vivitxir@gmail.com",
+    "phone": "13714539349",
+    "location": "",
+    "url": {
+      "label": "",
+      "href": ""
+    },
+    "customFields": [],
+    "picture": {
+      "url": "https://i.imgur.com/HgwyOuJ.jpg",
+      "size": 120,
+      "aspectRatio": 1,
+      "borderRadius": 0,
+      "effects": {
+        "hidden": false,
+        "border": false,
+        "grayscale": false
+      }
+    }
+  },
+  "sections": {
+    "summary": {
+      "name": "教育背景",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": true,
+      "id": "summary",
+      "content": "<p><strong>河北工程大学</strong></p><p>2020年9月 - 2024年6月<br>信息与电气工程学院 - 软件工程</p>"
+    },
+    "awards": {
+      "name": "获奖经历",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "awards",
+      "items": []
+    },
+    "certifications": {
+      "name": "证书认证",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "certifications",
+      "items": []
+    },
+    "education": {
+      "name": "教育详情",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "education",
+      "items": []
+    },
+    "experience": {
+      "name": "工作经历",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "experience",
+      "items": []
+    },
+    "volunteer": {
+      "name": "志愿服务",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "volunteer",
+      "items": []
+    },
+    "interests": {
+      "name": "兴趣爱好",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "interests",
+      "items": []
+    },
+    "languages": {
+      "name": "语言能力",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "languages",
+      "items": []
+    },
+    "profiles": {
+      "name": "Profiles",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": true,
+      "id": "profiles",
+      "items": [
+        {
+          "id": "ukl0uecvzkgm27mlye0wazlb",
+          "visible": true,
+          "network": "GitHub",
+          "username": "https://github.com/vivitrx",
+          "icon": "github",
+          "url": {
+            "label": "",
+            "href": "https://github.com/johndoe"
+          }
+        }
+      ]
+    },
+    "projects": {
+      "name": "项目经历",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": true,
+      "id": "projects",
+      "items": [
+        {
+          "id": "yw843emozcth8s1ubi1ubvlf",
+          "visible": true,
+          "name": "E-Commerce Platform",
+          "description": "Project Lead",
+          "date": "",
+          "summary": "<p>Led the development of a full-stack e-commerce platform, improving sales conversion by 25%.</p>",
+          "keywords": [],
+          "url": {
+            "label": "",
+            "href": ""
+          }
+        },
+        {
+          "id": "ncxgdjjky54gh59iz2t1xi1v",
+          "visible": true,
+          "name": "Interactive Dashboard",
+          "description": "Frontend Developer",
+          "date": "",
+          "summary": "<p>Created an interactive analytics dashboard for a SaaS application, enhancing data visualization for clients.</p>",
+          "keywords": [],
+          "url": {
+            "label": "",
+            "href": ""
+          }
+        }
+      ]
+    },
+    "publications": {
+      "name": "出版物",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "publications",
+      "items": []
+    },
+    "references": {
+      "name": "推荐人",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": false,
+      "id": "references",
+      "items": [
+        {
+          "id": "f2sv5z0cce6ztjl87yuk8fak",
+          "visible": true,
+          "name": "Available upon request",
+          "description": "",
+          "summary": "",
+          "url": {
+            "label": "",
+            "href": ""
+          }
+        }
+      ]
+    },
+    "skills": {
+      "name": "技术栈",
+      "columns": 1,
+      "separateLinks": true,
+      "visible": true,
+      "id": "skills",
+      "items": [
+        {
+          "id": "mac9bus5pwbpifa7c29be6xw",
+          "visible": true,
+          "name": "C++",
+          "description": "掌握C++17标准，熟悉现代C++特性（Lambda表达式、智能指针、RAII），了解模板元编程、内存管理、异常处理机制",
+          "level": 0,
+          "keywords": []
+        },
+        {
+          "id": "h275g5e7le0f6490xrdvadaq",
+          "visible": true,
+          "name": "并行编程",
+          "description": "了解多线程编程，熟悉std::thread、std::mutex等基础并发控制，初步接触过Intel TBB并行计算框架",
+          "level": 0,
+          "keywords": []
+        },
+        {
+          "id": "gklkmte2jkaprjj9kxidtem1",
+          "visible": true,
+          "name": "性能优化",
+          "description": "了解基本的性能优化概念，如SIMD向量化、内存对齐、缓存优化等原理，有实际的算法优化实践经验",
+          "level": 0,
+          "keywords": []
+        },
+        {
+          "id": "fpsjcn9mxv9f2vw7sqdxzu90",
+          "visible": true,
+          "name": "网络编程",
+          "description": "了解HTTP协议基础，使用过libcurl库进行网络请求，了解基本的网络编程概念",
+          "level": 0,
+          "keywords": []
+        },
+        {
+          "id": "y0anno60opggfokkd1xd52lx",
+          "visible": true,
+          "name": "数据结构与算法",
+          "description": "熟悉常用数据结构和算法，了解Git对象模型、压缩算法等实际应用场景",
+          "level": 0,
+          "keywords": []
+        },
+        {
+          "id": "new1",
+          "visible": true,
+          "name": "构建系统",
+          "description": "熟悉CMake基础使用，了解跨平台项目构建、依赖管理等基本概念",
+          "level": 0,
+          "keywords": []
+        },
+        {
+          "id": "new2",
+          "visible": true,
+          "name": "版本控制",
+          "description": "熟悉Git基本操作，了解Git内部原理（对象存储、分支管理等），有Git协议实现的实践经验",
+          "level": 0,
+          "keywords": []
+        },
+        {
+          "id": "new3",
+          "visible": true,
+          "name": "加密与哈希",
+          "description": "了解SHA-1哈希算法、数据压缩等基础概念，有OpenSSL库的实际使用经验",
+          "level": 0,
+          "keywords": []
+        },
+        {
+          "id": "new4",
+          "visible": true,
+          "name": "项目经验",
+          "description": "通过课程项目和个人项目，具备C++项目开发经验，了解软件工程的基本流程和规范",
+          "level": 0,
+          "keywords": []
+        }
+      ]
+    },
+    "custom": {
+      "j2jsn6kam9webtbq2koryjno": {
+        "name": "Custom Section",
+        "columns": 1,
+        "separateLinks": true,
+        "visible": true,
+        "id": "j2jsn6kam9webtbq2koryjno",
+        "items": []
+      }
+    }
+  },
+  "metadata": {
+    "template": "onyx",
+    "layout": [
+      [
+        [
+          "summary",
+          "projects",
+          "skills",
+          "references",
+          "custom.j2jsn6kam9webtbq2koryjno"
+        ],
+        [
+          "profiles",
+          "awards",
+          "certifications",
+          "education",
+          "experience",
+          "volunteer",
+          "interests",
+          "languages",
+          "publications"
+        ]
+      ]
+    ],
+    "css": {
+      "value": "* {\n\toutline: 1px solid #000;\n\toutline-offset: 4px;\n}",
+      "visible": false
+    },
+    "page": {
+      "margin": 14,
+      "format": "a4",
+      "options": {
+        "breakLine": true,
+        "pageNumbers": true
+      }
+    },
+    "theme": {
+      "background": "#ffffff",
+      "text": "#000000",
+      "primary": "#ca8a04"
+    },
+    "typography": {
+      "font": {
+        "family": "Merriweather",
+        "subset": "latin",
+        "variants": [
+          "regular"
+        ],
+        "size": 13
+      },
+      "lineHeight": 1.75,
+      "hideIcons": false,
+      "underlineLinks": true
+    },
+    "notes": ""
+  }
+}

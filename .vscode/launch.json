@@ -1,59 +1,76 @@
-// .vscode/launch.json
 {
+  // 使用 IntelliSense 了解相关属性。 
+  // 悬停以查看现有属性的描述。
+  // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug git hash-object",
+      "name": "Debug apply_delta Tests",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/git",
-      "args": [
-        "cat-file",
-        "-p",
-        "9be7e6040d9fbf9c2270b936670909e6f130d128"
+      "program": "${workspaceFolder}/build/test_apply_delta",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/build",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "为 gdb 启用整齐打印",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
       ],
-      "stopAtEntry": false, // 是否在main函数入口暂停
-      "cwd": "${workspaceFolder}", // 工作目录
-      "environment": [], // 环境变量
-      "externalConsole": false, // 使用集成终端
-      "MIMode": "gdb", // 调试器类型
-      "miDebuggerPath": "/usr/bin/gdb", // GDB路径
-      "preLaunchTask": "build-project" // 调试前执行构建任务
+      "preLaunchTask": "build-tests",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "logging": {
+        "trace": false,
+        "traceResponse": false,
+        "engineLogging": false
+      }
     },
     {
-      "name": "Debug git ls-tree --name-only",
+      "name": "Debug Specific Test",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/git",
-      "args": [
-        "ls-tree",
-        "--name-only",
-        "9be7e6040d9fbf9c2270b936670909e6f130d128"
+      "program": "${workspaceFolder}/build/test_apply_delta",
+      "args": ["--gtest_filter=ApplyDeltaTest.SimpleAddInstruction"],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/build",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "为 gdb 启用整齐打印",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
       ],
-      "stopAtEntry": false, // 是否在main函数入口暂停
-      "cwd": "${workspaceFolder}", // 工作目录
-      "environment": [], // 环境变量
-      "externalConsole": false, // 使用集成终端
-      "MIMode": "gdb", // 调试器类型
-      "miDebuggerPath": "/usr/bin/gdb", // GDB路径
-      "preLaunchTask": "build-project" // 调试前执行构建任务
+      "preLaunchTask": "build-tests",
+      "miDebuggerPath": "/usr/bin/gdb"
     },
     {
-      "name": "Debug git write-tree",
+      "name": "Debug with GDB Console",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/git",
-      "args": [
-        "write-tree",
-        "write_tree_debugsss"
+      "program": "${workspaceFolder}/build/test_apply_delta",
+      "args": [],
+      "stopAtEntry": true,
+      "cwd": "${workspaceFolder}/build",
+      "environment": [],
+      "externalConsole": true,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "为 gdb 启用整齐打印",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
       ],
-      "stopAtEntry": false, // 是否在main函数入口暂停
-      "cwd": "${workspaceFolder}", // 工作目录
-      "environment": [], // 环境变量
-      "externalConsole": false, // 使用集成终端
-      "MIMode": "gdb", // 调试器类型
-      "miDebuggerPath": "/usr/bin/gdb", // GDB路径
-      "preLaunchTask": "build-project-for-write-tree" // 调试前执行构建任务
+      "preLaunchTask": "build-tests",
+      "miDebuggerPath": "/usr/bin/gdb"
     }
   ]
 }

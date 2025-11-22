@@ -1,75 +1,68 @@
 # Prerequisites
 *.d
 
-# Object files
+# Compiled Object files
+*.slo
+*.lo
 *.o
-*.ko
 *.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
 
 # Precompiled Headers
 *.gch
 *.pch
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
+# Compiled Dynamic libraries
 *.so
-*.so.*
 *.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
 
 # Executables
 *.exe
 *.out
 *.app
-*.i*86
-*.x86_64
-*.hex
+server
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
-build
+build/
 vcpkg_installed
-.cache/clangd/index/commands.cpp.FB8A3883E4EA936F.idx
-.cache/clangd/index/commands.h.C7BDAD5FAF82D2C6.idx
-.cache/clangd/index/debug.h.E702FAC62BD2BA2E.idx
-.cache/clangd/index/git_clone.cpp.7225A97D2432C911.idx
-.cache/clangd/index/main.cpp.3FEA487250DC0533.idx
-src/cpp/include
-reactive_resume-cmi781t6f0czbsp4vrsssxula.json
-.cache/clangd/index/git_clone.h.94B0E90F59AC3A65.idx
-recycle_bin/src_commands.cpp
-recycle_bin/src_commands.h_duplicate
-recycle_bin/src_cpp_include_commands.h
-recycle_bin/src_cpp_include_commands.h_duplicate
-recycle_bin/src_cpp_include_debug.h
-recycle_bin/src_cpp_include_debug.h_duplicate
-recycle_bin/src_cpp_include_git_clone.h
-recycle_bin/src_cpp_include_git_clone.h_duplicate
-recycle_bin/src_test_test.go
-recycle_bin/src_go-modules/go.sum
-.gitignore
-.gitignore
+.cache/clangd/index/clone_gadget.cpp.B1F59B8BEF365344.idx
+.cache/clangd/index/clone_gadget.h.2EC393AD61CB9CEF.idx
+.cache/clangd/index/refs.cpp.B26F2EAD49838837.idx
+.cache/clangd/index/refs.h.7915C6FDB989B873.idx
+.cache/clangd/index/Server.cpp.180904343722969F.idx
+.cache/clangd/index/test_apply_delta.cpp.B1CC96FC2196E6CA.idx
+simplegit-test2/lib/simplegit.rb
+simplegit-test2/README
+simplegit-test2/Rakefile
+zlib_tutorial_for_beginners.md
+VSCode预览编辑器快捷键配置.md
+socket概念解释.md
+inet_pton解释.md
+Git网络协议学习指南.md
+curl库最简用法教程.md
+compress_function_guide.md
+clone_debug.log
+面试难点准备.md
+底层原理与八股文关联分析.md
