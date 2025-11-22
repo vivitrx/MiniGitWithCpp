@@ -59,3 +59,17 @@ vcpkg_installed
 .cache/clangd/index/git_clone.cpp.7225A97D2432C911.idx
 .cache/clangd/index/main.cpp.3FEA487250DC0533.idx
 src/cpp/include
+reactive_resume-cmi781t6f0czbsp4vrsssxula.json
+.cache/clangd/index/git_clone.h.94B0E90F59AC3A65.idx
+recycle_bin/src_commands.cpp
+recycle_bin/src_commands.h_duplicate
+recycle_bin/src_cpp_include_commands.h
+recycle_bin/src_cpp_include_commands.h_duplicate
+recycle_bin/src_cpp_include_debug.h
+recycle_bin/src_cpp_include_debug.h_duplicate
+recycle_bin/src_cpp_include_git_clone.h
+recycle_bin/src_cpp_include_git_clone.h_duplicate
+recycle_bin/src_test_test.go
+recycle_bin/src_go-modules/go.sum
+.gitignore
+.gitignore
