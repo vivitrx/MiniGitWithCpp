@@ -38,7 +38,6 @@ add_executable(git ${SOURCE_FILES} ${HEADER_FILES})
 # 设置包含目录
 target_include_directories(git PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/include
 )
 
 # 设置目标属性

@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
   // when running tests.
   std::cerr << "Logs from your program will appear here!\n";
 
-  // Uncomment this block to pass the first stage
+  // Uncomment this block to pass first stage
 
   if (argc < 2) {
     std::cerr << "No command provided.\n";
